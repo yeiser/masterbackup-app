@@ -1,0 +1,89 @@
+@MasterBackup_API_HostAddress = https://localhost:7001
+@token = your-jwt-token-here
+
+### Registrar nuevo tenant y admin
+POST {{MasterBackup_API_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "admin@ejemplo.com",
+  "password": "Password123",
+  "firstName": "Juan",
+  "lastName": "Pérez",
+  "tenantName": "Mi Empresa",
+  "subdomain": "miempresa",
+  "enableTwoFactor": false
+}
+
+### Login sin 2FA
+POST {{MasterBackup_API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@ejemplo.com",
+  "password": "Password123"
+}
+
+### Login con 2FA
+POST {{MasterBackup_API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@ejemplo.com",
+  "password": "Password123",
+  "twoFactorCode": "123456"
+}
+
+### Obtener información del usuario actual
+GET {{MasterBackup_API_HostAddress}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### Habilitar 2FA
+POST {{MasterBackup_API_HostAddress}}/api/auth/enable-2fa
+Authorization: Bearer {{token}}
+
+### Deshabilitar 2FA
+POST {{MasterBackup_API_HostAddress}}/api/auth/disable-2fa
+Authorization: Bearer {{token}}
+
+### Solicitar recuperación de contraseña
+POST {{MasterBackup_API_HostAddress}}/api/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "admin@ejemplo.com"
+}
+
+### Restablecer contraseña
+POST {{MasterBackup_API_HostAddress}}/api/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "admin@ejemplo.com",
+  "token": "reset-token-from-email",
+  "newPassword": "NewPassword123"
+}
+
+### Invitar usuario (solo Admin)
+POST {{MasterBackup_API_HostAddress}}/api/users/invite
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "email": "usuario@ejemplo.com",
+  "role": "User"
+}
+
+### Aceptar invitación
+POST {{MasterBackup_API_HostAddress}}/api/auth/accept-invitation
+Content-Type: application/json
+
+{
+  "token": "invitation-token-from-email",
+  "password": "Password123",
+  "firstName": "María",
+  "lastName": "García",
+  "enableTwoFactor": false
+}
+
+###
