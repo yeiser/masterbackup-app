@@ -7,7 +7,8 @@
       "enabled": true,
       "path": "C:/Temp/angular-cache",
       "environment": "all"
-    }
+    },
+    "analytics": "237ae4cf-3da3-4c7b-b293-d35f42a13545"
   },
   "projects": {
     "MasterBackup-App": {
