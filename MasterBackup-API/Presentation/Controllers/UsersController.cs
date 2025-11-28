@@ -53,9 +53,9 @@ public class UsersController : ControllerBase
 
         if (!result)
         {
-            return BadRequest(new { message = "Failed to send invitation. User may already exist or have a pending invitation." });
+            return BadRequest(new { message = "Error al enviar la invitación. El usuario ya existe o tiene una invitación pendiente." });
         }
 
-        return Ok(new { message = "Invitation sent successfully" });
+        return Ok(new { message = "Invitación enviada exitosamente" });
     }
 }

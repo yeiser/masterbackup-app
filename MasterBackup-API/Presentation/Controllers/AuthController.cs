@@ -163,7 +163,7 @@ public class AuthController : ControllerBase
 
         await _mediator.Send(command);
 
-        return Ok(new { message = "If your email exists, you will receive a password reset link" });
+        return Ok(new { message = "Si tu correo existe, recibirás un enlace para restablecer tu contraseña" });
     }
 
     /// <summary>
@@ -184,10 +184,10 @@ public class AuthController : ControllerBase
 
         if (!result)
         {
-            return BadRequest(new { message = "Invalid or expired reset token" });
+            return BadRequest(new { message = "Token de restablecimiento inválido o expirado" });
         }
 
-        return Ok(new { message = "Password reset successfully" });
+        return Ok(new { message = "Contraseña restablecida exitosamente" });
     }
 
     /// <summary>
@@ -240,10 +240,10 @@ public class AuthController : ControllerBase
 
         if (!result)
         {
-            return BadRequest(new { message = "Failed to enable 2FA" });
+            return BadRequest(new { message = "Error al habilitar 2FA" });
         }
 
-        return Ok(new { message = "2FA enabled successfully" });
+        return Ok(new { message = "2FA habilitado exitosamente" });
     }
 
     /// <summary>
@@ -266,10 +266,10 @@ public class AuthController : ControllerBase
 
         if (!result)
         {
-            return BadRequest(new { message = "Failed to disable 2FA" });
+            return BadRequest(new { message = "Error al deshabilitar 2FA" });
         }
 
-        return Ok(new { message = "2FA disabled successfully" });
+        return Ok(new { message = "2FA deshabilitado exitosamente" });
     }
 
     /// <summary>

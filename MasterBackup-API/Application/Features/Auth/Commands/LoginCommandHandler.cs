@@ -83,10 +83,10 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
 
                 return new AuthResponseDto
                 {
-                    Success = false,
+                    Success = true,
                     RequiresTwoFactor = true,
                     TwoFactorRequired = true,
-                    Message = "2FA code sent to your email"
+                    Message = "Código 2FA enviado a tu correo electrónico",
                 };
             }
 
@@ -122,7 +122,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "An error occurred during login"
+                Message = "Ocurrió un error durante el inicio de sesión"
             };
         }
     }

@@ -28,7 +28,7 @@ public class TenantService : ITenantService
 
         if (tenant == null)
         {
-            throw new Exception("Tenant not found or inactive");
+            throw new Exception("Tenant no encontrado o inactivo");
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();

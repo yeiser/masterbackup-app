@@ -50,7 +50,7 @@ public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCo
                 return new AuthResponseDto
                 {
                     Success = false,
-                    Message = "Invalid or expired invitation"
+                    Message = "Invitación inválida o expirada"
                 };
             }
 
@@ -63,7 +63,7 @@ public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCo
                 return new AuthResponseDto
                 {
                     Success = false,
-                    Message = "Invalid invitation"
+                    Message = "Invitación inválida"
                 };
             }
 
@@ -119,7 +119,7 @@ public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCo
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "An error occurred while accepting the invitation"
+                Message = "Ocurrió un error al aceptar la invitación"
             };
         }
     }

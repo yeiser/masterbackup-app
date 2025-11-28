@@ -60,7 +60,7 @@ public class Verify2FACommandHandler : IRequestHandler<Verify2FACommand, AuthRes
                 return new AuthResponseDto
                 {
                     Success = false,
-                    Message = "Invalid credentials"
+                    Message = "Credenciales inválidas"
                 };
             }
 
@@ -74,7 +74,7 @@ public class Verify2FACommandHandler : IRequestHandler<Verify2FACommand, AuthRes
                 return new AuthResponseDto
                 {
                     Success = false,
-                    Message = "Invalid or expired 2FA code"
+                    Message = "Código 2FA inválido o expirado"
                 };
             }
 
@@ -115,7 +115,7 @@ public class Verify2FACommandHandler : IRequestHandler<Verify2FACommand, AuthRes
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "An error occurred during 2FA verification"
+                Message = "Ocurrió un error durante la verificación 2FA"
             };
         }
     }

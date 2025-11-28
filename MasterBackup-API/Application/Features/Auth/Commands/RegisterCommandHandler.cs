@@ -50,7 +50,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
                 return new AuthResponseDto
                 {
                     Success = false,
-                    Message = "Email already exists"
+                    Message = "El correo electrónico ya existe"
                 };
             }
 
@@ -123,7 +123,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
             return new AuthResponseDto
             {
                 Success = false,
-                Message = "An error occurred during registration"
+                Message = "Ocurrió un error durante el registro"
             };
         }
     }

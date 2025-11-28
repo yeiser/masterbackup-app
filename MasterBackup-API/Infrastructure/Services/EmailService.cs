@@ -24,12 +24,12 @@ public class EmailService : IEmailService
 
     public async Task SendTwoFactorCodeAsync(ApplicationUser user, string code)
     {
-        var subject = "Your Two-Factor Authentication Code";
+        var subject = "Tu Código de Autenticación de Dos Factores";
         var htmlBody = $@"
-            <h2>Two-Factor Authentication</h2>
-            <p>Your verification code is: <strong>{code}</strong></p>
-            <p>This code will expire in 10 minutes.</p>
-            <p>If you didn't request this code, please ignore this email.</p>
+            <h2>Autenticación de Dos Factores</h2>
+            <p>Tu código de verificación es: <strong>{code}</strong></p>
+            <p>Este código expirará en 10 minutos.</p>
+            <p>Si no solicitaste este código, por favor ignora este correo.</p>
         ";
 
         await SendEmailAsync(user, subject, htmlBody);
@@ -38,14 +38,14 @@ public class EmailService : IEmailService
     public async Task SendPasswordResetEmailAsync(ApplicationUser user, string resetToken)
     {
         var resetUrl = $"{_configuration["AppUrl"]}/reset-password?token={resetToken}&email={user.Email}";
-        var subject = "Reset Your Password";
+        var subject = "Restablecer tu Contraseña";
         var htmlBody = $@"
-            <h2>Password Reset Request</h2>
-            <p>You requested to reset your password.</p>
-            <p>Click the link below to reset your password:</p>
-            <p><a href='{resetUrl}'>Reset Password</a></p>
-            <p>This link will expire in 1 hour.</p>
-            <p>If you didn't request this, please ignore this email.</p>
+            <h2>Solicitud de Restablecimiento de Contraseña</h2>
+            <p>Solicitaste restablecer tu contraseña.</p>
+            <p>Haz clic en el enlace de abajo para restablecer tu contraseña:</p>
+            <p><a href='{resetUrl}'>Restablecer Contraseña</a></p>
+            <p>Este enlace expirará en 1 hora.</p>
+            <p>Si no solicitaste esto, por favor ignora este correo.</p>
         ";
 
         await SendEmailAsync(user, subject, htmlBody);
@@ -54,13 +54,13 @@ public class EmailService : IEmailService
     public async Task SendInvitationEmailAsync(ApplicationUser user, string invitationToken, string inviterName)
     {
         var invitationUrl = $"{_configuration["AppUrl"]}/accept-invitation?token={invitationToken}";
-        var subject = "You've Been Invited!";
+        var subject = "¡Has sido invitado!";
         var htmlBody = $@"
-            <h2>Team Invitation</h2>
-            <p>{inviterName} has invited you to join their team.</p>
-            <p>Click the link below to accept the invitation and create your account:</p>
-            <p><a href='{invitationUrl}'>Accept Invitation</a></p>
-            <p>This invitation will expire in 7 days.</p>
+            <h2>Invitación al Equipo</h2>
+            <p>{inviterName} te ha invitado a unirte a su equipo.</p>
+            <p>Haz clic en el enlace de abajo para aceptar la invitación y crear tu cuenta:</p>
+            <p><a href='{invitationUrl}'>Aceptar Invitación</a></p>
+            <p>Esta invitación expirará en 7 días.</p>
         ";
 
         await SendEmailAsync(user, subject, htmlBody);
@@ -86,7 +86,8 @@ public class EmailService : IEmailService
             var fromName = _configuration["Maileroo:FromName"];
 
             var client = _httpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+            //client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
             var emailPayload = new
             {
