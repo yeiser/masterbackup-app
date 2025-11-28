@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using MasterBackup_API.Application.Common.Interfaces;
+using MasterBackup_API.Domain.Entities;
 
 namespace MasterBackup_API.Infrastructure.Services;
 
@@ -21,7 +22,7 @@ public class EmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task SendTwoFactorCodeAsync(string email, string code)
+    public async Task SendTwoFactorCodeAsync(ApplicationUser user, string code)
     {
         var subject = "Your Two-Factor Authentication Code";
         var htmlBody = $@"
@@ -31,12 +32,12 @@ public class EmailService : IEmailService
             <p>If you didn't request this code, please ignore this email.</p>
         ";
 
-        await SendEmailAsync(email, subject, htmlBody);
+        await SendEmailAsync(user, subject, htmlBody);
     }
 
-    public async Task SendPasswordResetEmailAsync(string email, string resetToken)
+    public async Task SendPasswordResetEmailAsync(ApplicationUser user, string resetToken)
     {
-        var resetUrl = $"{_configuration["AppUrl"]}/reset-password?token={resetToken}&email={email}";
+        var resetUrl = $"{_configuration["AppUrl"]}/reset-password?token={resetToken}&email={user.Email}";
         var subject = "Reset Your Password";
         var htmlBody = $@"
             <h2>Password Reset Request</h2>
@@ -47,10 +48,10 @@ public class EmailService : IEmailService
             <p>If you didn't request this, please ignore this email.</p>
         ";
 
-        await SendEmailAsync(email, subject, htmlBody);
+        await SendEmailAsync(user, subject, htmlBody);
     }
 
-    public async Task SendInvitationEmailAsync(string email, string invitationToken, string inviterName)
+    public async Task SendInvitationEmailAsync(ApplicationUser user, string invitationToken, string inviterName)
     {
         var invitationUrl = $"{_configuration["AppUrl"]}/accept-invitation?token={invitationToken}";
         var subject = "You've Been Invited!";
@@ -62,22 +63,21 @@ public class EmailService : IEmailService
             <p>This invitation will expire in 7 days.</p>
         ";
 
-        await SendEmailAsync(email, subject, htmlBody);
+        await SendEmailAsync(user, subject, htmlBody);
     }
 
-    public async Task SendWelcomeEmailAsync(string email, string name)
+    public async Task SendWelcomeEmailAsync(ApplicationUser user)
     {
-        var subject = "Welcome to Our Platform!";
-        var htmlBody = $@"
-            <h2>Welcome, {name}!</h2>
-            <p>Thank you for joining our platform.</p>
-            <p>We're excited to have you on board!</p>
-        ";
+        var subject = "Bienvenido a MasterBackup!";
+        var templateData = new Dictionary<string, string>
+        {
+            { "USERNAME", $"{user.FirstName} {user.LastName}" }
+        };
 
-        await SendEmailAsync(email, subject, htmlBody);
+        await SendEmailAsync(user, subject, null, "4530", templateData);
     }
 
-    private async Task SendEmailAsync(string to, string subject, string htmlBody)
+    private async Task SendEmailAsync(ApplicationUser user, string subject, string? htmlBody, string templateId = null, Dictionary<string, string> templateData = null)
     {
         try
         {
@@ -90,10 +90,11 @@ public class EmailService : IEmailService
 
             var emailPayload = new
             {
-                from = new { email = fromEmail, name = fromName },
-                to = new[] { new { email = to } },
+                from = new { address = fromEmail, display_name = fromName },
+                to = new[] { new { address = user.Email , display_name = user.FirstName } },
                 subject = subject,
-                html = htmlBody
+                template_id = templateId,
+                template_data = templateData
             };
 
             var content = new StringContent(
@@ -102,20 +103,20 @@ public class EmailService : IEmailService
                 "application/json"
             );
 
-            var response = await client.PostAsync("https://smtp.maileroo.com/api/v2/emails", content);
+            var response = await client.PostAsync("https://smtp.maileroo.com/api/v2/emails/template", content);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError($"Failed to send email to {to}. Status: {response.StatusCode}, Error: {errorContent}");
+                _logger.LogError($"Failed to send email to {emailPayload.to[0].address}. Status: {response.StatusCode}, Error: {errorContent}");
                 throw new Exception($"Failed to send email: {errorContent}");
             }
 
-            _logger.LogInformation($"Email sent successfully to {to}");
+            _logger.LogInformation($"Email sent successfully to {emailPayload.to[0].address}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error sending email to {to}");
+            _logger.LogError(ex, $"Error sending email");
             throw;
         }
     }

@@ -66,7 +66,7 @@ public class InviteUserCommandHandler : IRequestHandler<InviteUserCommand, bool>
             await _masterContext.SaveChangesAsync(cancellationToken);
 
             await _emailService.SendInvitationEmailAsync(
-                invitation.Email,
+                new ApplicationUser { Email = invitation.Email },
                 invitation.InvitationToken,
                 $"{inviter?.FirstName} {inviter?.LastName}"
             );

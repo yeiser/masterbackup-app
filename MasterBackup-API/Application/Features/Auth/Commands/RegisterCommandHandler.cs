@@ -97,7 +97,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
                 };
             }
 
-            await _emailService.SendWelcomeEmailAsync(user.Email!, user.FirstName);
+            await _emailService.SendWelcomeEmailAsync(user);
 
             var token = GenerateJwtToken(user);
 

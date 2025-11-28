@@ -95,7 +95,7 @@ public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCo
             invitation.AcceptedAt = DateTime.UtcNow;
             await _masterContext.SaveChangesAsync(cancellationToken);
 
-            await _emailService.SendWelcomeEmailAsync(user.Email!, user.FirstName);
+            await _emailService.SendWelcomeEmailAsync(user);
 
             var token = GenerateJwtToken(user);
 

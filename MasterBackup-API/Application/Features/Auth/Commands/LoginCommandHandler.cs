@@ -77,7 +77,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
                 user.TwoFactorCodeExpiry = DateTime.UtcNow.AddMinutes(10);
                 await _userManager.UpdateAsync(user);
 
-                await _emailService.SendTwoFactorCodeAsync(user.Email!, code);
+                await _emailService.SendTwoFactorCodeAsync(user!, code);
 
                 _logger.LogInformation("2FA code sent to user: {Email}", request.Email);
 

@@ -50,7 +50,7 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
                     user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
                     await userManager.UpdateAsync(user);
 
-                    await _emailService.SendPasswordResetEmailAsync(user.Email!, resetToken);
+                    await _emailService.SendPasswordResetEmailAsync(user!, resetToken);
                     return true;
                 }
             }
