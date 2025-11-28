@@ -102,7 +102,7 @@ public class EmailService : IEmailService
                 "application/json"
             );
 
-            var response = await client.PostAsync("https://smtp.maileroo.com/send", content);
+            var response = await client.PostAsync("https://smtp.maileroo.com/api/v2/emails", content);
 
             if (!response.IsSuccessStatusCode)
             {

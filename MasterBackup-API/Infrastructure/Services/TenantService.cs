@@ -37,28 +37,22 @@ public class TenantService : ITenantService
         return optionsBuilder.Options;
     }
 
-    public async Task<DbContextOptions<TenantDbContext>> GetTenantDbContextOptionsBySubdomainAsync(string subdomain)
-    {
-        var tenant = await _masterContext.Tenants
-            .FirstOrDefaultAsync(t => t.Subdomain == subdomain && t.IsActive);
-
-        if (tenant == null)
-        {
-            throw new Exception("Tenant not found or inactive");
-        }
-
-        var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();
-        optionsBuilder.UseNpgsql(tenant.ConnectionString);
-
-        return optionsBuilder.Options;
-    }
-
-    public async Task<string> CreateTenantDatabaseAsync(Guid tenantId, string tenantName, string subdomain)
+    public async Task<string> CreateTenantDatabaseAsync(Guid tenantId, string tenantName)
     {
         try
         {
-            var masterConnectionString = _configuration.GetConnectionString("MasterDatabase");
-            var dbName = $"tenant_{subdomain.ToLower()}_{tenantId:N}";
+            // Get master connection string from environment variable or appsettings
+            var masterConnectionString = Environment.GetEnvironmentVariable("MASTER_DATABASE_CONNECTION") 
+                ?? _configuration.GetConnectionString("MasterDatabase");
+
+            if (string.IsNullOrEmpty(masterConnectionString))
+            {
+                throw new InvalidOperationException("Master database connection string is not configured. Set MASTER_DATABASE_CONNECTION environment variable or ConnectionStrings:MasterDatabase in appsettings.");
+            }
+
+            var dbName = $"tenant_{tenantId:N}";
+
+            _logger.LogInformation($"Creating database '{dbName}' for tenant: {tenantName}");
 
             // Create new database
             var optionsBuilder = new DbContextOptionsBuilder<DbContext>();
@@ -72,7 +66,12 @@ public class TenantService : ITenantService
             }
 
             // Build connection string for new tenant database
-            var tenantConnectionString = masterConnectionString?.Replace("Database=master", $"Database={dbName}");
+            // Extract components from master connection string
+            var builder = new Npgsql.NpgsqlConnectionStringBuilder(masterConnectionString);
+            builder.Database = dbName;
+            var tenantConnectionString = builder.ConnectionString;
+
+            _logger.LogInformation($"Tenant connection string created: Database={dbName}");
 
             // Run migrations on new tenant database
             var tenantOptionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();
@@ -83,9 +82,9 @@ public class TenantService : ITenantService
                 await tenantContext.Database.MigrateAsync();
             }
 
-            _logger.LogInformation($"Created database for tenant: {tenantName} ({subdomain})");
+            _logger.LogInformation($"Successfully created and migrated database for tenant: {tenantName}");
 
-            return tenantConnectionString ?? throw new Exception("Failed to create connection string");
+            return tenantConnectionString;
         }
         catch (Exception ex)
         {

@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using FluentValidation;
 using MasterBackup_API.Application.Common.DTOs;
 using MasterBackup_API.Application.Features.Auth.Commands;
 using System.Security.Claims;
@@ -13,11 +14,37 @@ public class AuthController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ILogger<AuthController> _logger;
+    private readonly IValidator<RegisterDto> _registerValidator;
+    private readonly IValidator<ValidateEmailDto> _validateEmailValidator;
+    private readonly IValidator<LoginDto> _loginValidator;
+    private readonly IValidator<Verify2FADto> _verify2FAValidator;
+    private readonly IValidator<ForgotPasswordDto> _forgotPasswordValidator;
+    private readonly IValidator<ResetPasswordDto> _resetPasswordValidator;
+    private readonly IValidator<AcceptInvitationDto> _acceptInvitationValidator;
+    private readonly IValidator<InviteUserDto> _inviteUserValidator;
 
-    public AuthController(IMediator mediator, ILogger<AuthController> logger)
+    public AuthController(
+        IMediator mediator, 
+        ILogger<AuthController> logger,
+        IValidator<RegisterDto> registerValidator,
+        IValidator<ValidateEmailDto> validateEmailValidator,
+        IValidator<LoginDto> loginValidator,
+        IValidator<Verify2FADto> verify2FAValidator,
+        IValidator<ForgotPasswordDto> forgotPasswordValidator,
+        IValidator<ResetPasswordDto> resetPasswordValidator,
+        IValidator<AcceptInvitationDto> acceptInvitationValidator,
+        IValidator<InviteUserDto> inviteUserValidator)
     {
         _mediator = mediator;
         _logger = logger;
+        _registerValidator = registerValidator;
+        _validateEmailValidator = validateEmailValidator;
+        _loginValidator = loginValidator;
+        _verify2FAValidator = verify2FAValidator;
+        _forgotPasswordValidator = forgotPasswordValidator;
+        _resetPasswordValidator = resetPasswordValidator;
+        _acceptInvitationValidator = acceptInvitationValidator;
+        _inviteUserValidator = inviteUserValidator;
     }
 
     /// <summary>
@@ -26,9 +53,10 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto registerDto)
     {
-        if (!ModelState.IsValid)
+        var validationResult = await _registerValidator.ValidateAsync(registerDto);
+        if (!validationResult.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
         }
 
         var command = new RegisterCommand(
@@ -37,7 +65,6 @@ public class AuthController : ControllerBase
             registerDto.FirstName,
             registerDto.LastName,
             registerDto.TenantName,
-            registerDto.Subdomain,
             registerDto.EnableTwoFactor
         );
 
@@ -52,26 +79,68 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Validate if email exists in the system
+    /// </summary>
+    [HttpPost("validate-email")]
+    public async Task<IActionResult> ValidateEmail([FromBody] ValidateEmailDto validateEmailDto)
+    {
+        var validationResult = await _validateEmailValidator.ValidateAsync(validateEmailDto);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
+        }
+
+        var command = new ValidateEmailCommand(validateEmailDto);
+        var result = await _mediator.Send(command);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Login with email and password
     /// </summary>
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
     {
-        if (!ModelState.IsValid)
+        var validationResult = await _loginValidator.ValidateAsync(loginDto);
+        if (!validationResult.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
         }
 
-        var command = new LoginCommand(loginDto.Email, loginDto.Password, loginDto.TwoFactorCode);
+        var command = new LoginCommand(loginDto);
 
         var result = await _mediator.Send(command);
 
         if (!result.Success)
         {
-            if (result.RequiresTwoFactor)
+            if (result.RequiresTwoFactor || result.TwoFactorRequired)
             {
-                return Ok(new { requiresTwoFactor = true, message = result.Message });
+                return Ok(new { twoFactorRequired = true, message = result.Message });
             }
+            return Unauthorized(new { message = result.Message });
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Verify 2FA code and complete login
+    /// </summary>
+    [HttpPost("verify-2fa")]
+    public async Task<IActionResult> Verify2FA([FromBody] Verify2FADto verify2FADto)
+    {
+        var validationResult = await _verify2FAValidator.ValidateAsync(verify2FADto);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
+        }
+
+        var command = new Verify2FACommand(verify2FADto);
+        var result = await _mediator.Send(command);
+
+        if (!result.Success)
+        {
             return Unauthorized(new { message = result.Message });
         }
 
@@ -84,9 +153,10 @@ public class AuthController : ControllerBase
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto forgotPasswordDto)
     {
-        if (!ModelState.IsValid)
+        var validationResult = await _forgotPasswordValidator.ValidateAsync(forgotPasswordDto);
+        if (!validationResult.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
         }
 
         var command = new ForgotPasswordCommand(forgotPasswordDto.Email);
@@ -102,9 +172,10 @@ public class AuthController : ControllerBase
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto resetPasswordDto)
     {
-        if (!ModelState.IsValid)
+        var validationResult = await _resetPasswordValidator.ValidateAsync(resetPasswordDto);
+        if (!validationResult.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
         }
 
         var command = new ResetPasswordCommand(resetPasswordDto.Email, resetPasswordDto.Token, resetPasswordDto.NewPassword);
@@ -125,9 +196,10 @@ public class AuthController : ControllerBase
     [HttpPost("accept-invitation")]
     public async Task<IActionResult> AcceptInvitation([FromBody] AcceptInvitationDto acceptInvitationDto)
     {
-        if (!ModelState.IsValid)
+        var validationResult = await _acceptInvitationValidator.ValidateAsync(acceptInvitationDto);
+        if (!validationResult.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
         }
 
         var command = new AcceptInvitationCommand(

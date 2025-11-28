@@ -1,31 +1,26 @@
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using MasterBackup_API.Domain.Entities;
 
 namespace MasterBackup_API.Infrastructure.Persistence;
 
-public class TenantDbContext : IdentityDbContext<ApplicationUser>
+/// <summary>
+/// Context for tenant-specific business data.
+/// Does NOT include Identity tables (Users, Roles) - those are in MasterDbContext.
+/// Connection string is resolved dynamically per request via TenantMiddleware.
+/// </summary>
+public class TenantDbContext : DbContext
 {
     public TenantDbContext(DbContextOptions<TenantDbContext> options) : base(options)
     {
     }
 
-    public DbSet<UserInvitation> UserInvitations { get; set; }
+    // Add tenant-specific business entities here
+    // Example: public DbSet<Order> Orders { get; set; }
+    // Example: public DbSet<Product> Products { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<ApplicationUser>(entity =>
-        {
-            entity.Property(e => e.Role).HasConversion<string>();
-        });
-
-        modelBuilder.Entity<UserInvitation>(entity =>
-        {
-            entity.HasIndex(e => e.Email);
-            entity.HasIndex(e => e.InvitationToken).IsUnique();
-            entity.Property(e => e.Role).HasConversion<string>();
-        });
+        // Configure tenant-specific entities here
     }
 }

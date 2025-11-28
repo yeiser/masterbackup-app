@@ -16,20 +16,20 @@ namespace MasterBackup_API.Application.Features.Auth.Commands;
 public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto>
 {
     private readonly MasterDbContext _masterContext;
-    private readonly ITenantService _tenantService;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<LoginCommandHandler> _logger;
 
     public LoginCommandHandler(
         MasterDbContext masterContext,
-        ITenantService tenantService,
+        UserManager<ApplicationUser> userManager,
         IEmailService emailService,
         IConfiguration configuration,
         ILogger<LoginCommandHandler> logger)
     {
         _masterContext = masterContext;
-        _tenantService = tenantService;
+        _userManager = userManager;
         _emailService = emailService;
         _configuration = configuration;
         _logger = logger;
@@ -39,94 +39,81 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
     {
         try
         {
-            // Find user's tenant by email (we need to search across all tenants)
-            var allTenants = await _masterContext.Tenants
-                .Where(t => t.IsActive)
-                .ToListAsync(cancellationToken);
+            _logger.LogInformation("Login attempt for email: {Email}", request.Email);
 
-            foreach (var tenant in allTenants)
+            // Find user by email (email must be unique globally)
+            var user = await _masterContext.Users
+                .Include(u => u)
+                .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive, cancellationToken);
+
+            if (user == null)
             {
-                var tenantOptions = await _tenantService.GetTenantDbContextOptionsAsync(tenant.Id);
-                using var tenantContext = new TenantDbContext(tenantOptions);
-
-                var userManager = CreateUserManager(tenantContext);
-                var user = await userManager.FindByEmailAsync(request.Email);
-
-                if (user != null && user.IsActive)
+                _logger.LogWarning("User not found or inactive: {Email}", request.Email);
+                return new AuthResponseDto
                 {
-                    var isPasswordValid = await userManager.CheckPasswordAsync(user, request.Password);
-
-                    if (!isPasswordValid)
-                    {
-                        return new AuthResponseDto
-                        {
-                            Success = false,
-                            Message = "Invalid credentials"
-                        };
-                    }
-
-                    // Check if 2FA is enabled
-                    if (user.TwoFactorEnabled)
-                    {
-                        if (string.IsNullOrEmpty(request.TwoFactorCode))
-                        {
-                            // Generate and send 2FA code
-                            var code = GenerateTwoFactorCode();
-                            user.TwoFactorCode = code;
-                            user.TwoFactorCodeExpiry = DateTime.UtcNow.AddMinutes(10);
-                            await userManager.UpdateAsync(user);
-
-                            await _emailService.SendTwoFactorCodeAsync(user.Email!, code);
-
-                            return new AuthResponseDto
-                            {
-                                Success = false,
-                                RequiresTwoFactor = true,
-                                Message = "2FA code sent to your email"
-                            };
-                        }
-                        else
-                        {
-                            // Verify 2FA code
-                            if (user.TwoFactorCode != request.TwoFactorCode ||
-                                user.TwoFactorCodeExpiry < DateTime.UtcNow)
-                            {
-                                return new AuthResponseDto
-                                {
-                                    Success = false,
-                                    Message = "Invalid or expired 2FA code"
-                                };
-                            }
-
-                            // Clear 2FA code
-                            user.TwoFactorCode = null;
-                            user.TwoFactorCodeExpiry = null;
-                            await userManager.UpdateAsync(user);
-                        }
-                    }
-
-                    var token = GenerateJwtToken(user);
-
-                    return new AuthResponseDto
-                    {
-                        Success = true,
-                        Token = token,
-                        User = new UserDto
-                        {
-                            Id = user.Id,
-                            Email = user.Email!,
-                            FirstName = user.FirstName,
-                            LastName = user.LastName,
-                            Role = user.Role.ToString()
-                        }
-                    };
-                }
+                    Success = false,
+                    Message = "Invalid credentials"
+                };
             }
+
+            var isPasswordValid = await _userManager.CheckPasswordAsync(user, request.Password);
+
+            if (!isPasswordValid)
+            {
+                _logger.LogWarning("Invalid password for user: {Email}", request.Email);
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid credentials"
+                };
+            }
+
+            // Check if 2FA is enabled
+            if (user.TwoFactorEnabled)
+            {
+                // Generate and send 2FA code
+                var code = GenerateTwoFactorCode();
+                user.TwoFactorCode = code;
+                user.TwoFactorCodeExpiry = DateTime.UtcNow.AddMinutes(10);
+                await _userManager.UpdateAsync(user);
+
+                await _emailService.SendTwoFactorCodeAsync(user.Email!, code);
+
+                _logger.LogInformation("2FA code sent to user: {Email}", request.Email);
+
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    RequiresTwoFactor = true,
+                    TwoFactorRequired = true,
+                    Message = "2FA code sent to your email"
+                };
+            }
+
+            // Login exitoso sin 2FA
+            var token = GenerateJwtToken(user, user.TenantId);
+
+            _logger.LogInformation("Login successful for user: {Email}", request.Email);
 
             return new AuthResponseDto
             {
-                Success = false,
-                Message = "Invalid credentials"
+                Success = true,
+                Token = token,
+                UserId = user.Id,
+                Email = user.Email!,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Role = user.Role.ToString(),
+                TenantId = user.TenantId.ToString(),
+                TwoFactorRequired = false,
+                User = new UserDto
+                {
+                    Id = user.Id,
+                    Email = user.Email!,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    Role = user.Role.ToString()
+                }
             };
         }
         catch (Exception ex)
@@ -140,32 +127,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
         }
     }
 
-    private UserManager<ApplicationUser> CreateUserManager(TenantDbContext context)
-    {
-        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<ApplicationUser>(context);
-        var options = new IdentityOptions();
-        var passwordHasher = new PasswordHasher<ApplicationUser>();
-        var userValidators = new List<IUserValidator<ApplicationUser>> { new UserValidator<ApplicationUser>() };
-        var passwordValidators = new List<IPasswordValidator<ApplicationUser>> { new PasswordValidator<ApplicationUser>() };
-        var keyNormalizer = new UpperInvariantLookupNormalizer();
-        var errors = new IdentityErrorDescriber();
-        var services = new ServiceCollection().BuildServiceProvider();
-        var logger = new Logger<UserManager<ApplicationUser>>(new LoggerFactory());
-
-        return new UserManager<ApplicationUser>(
-            userStore,
-            Microsoft.Extensions.Options.Options.Create(options),
-            passwordHasher,
-            userValidators,
-            passwordValidators,
-            keyNormalizer,
-            errors,
-            services,
-            logger
-        );
-    }
-
-    private string GenerateJwtToken(ApplicationUser user)
+    private string GenerateJwtToken(ApplicationUser user, Guid tenantId)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? throw new Exception("JWT Key not configured")));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -175,7 +137,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
-            new Claim("TenantId", user.TenantId.ToString()),
+            new Claim("TenantId", tenantId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

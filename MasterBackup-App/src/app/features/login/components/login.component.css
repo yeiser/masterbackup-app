@@ -1,0 +1,89 @@
+/* Animaciones de fade in */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Efectos hover para las tarjetas de cuenta */
+.hover-elevate-up:hover {
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+  box-shadow: 0 0.5rem 1.5rem 0.5rem rgba(0, 0, 0, 0.075);
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.border-hover:hover {
+  border-color: var(--bs-primary) !important;
+  background-color: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+/* Espaciado de letras para el código 2FA */
+.letter-spacing-2 {
+  letter-spacing: 0.5rem;
+}
+
+/* Estilos para el input de código 2FA */
+input[formControlName="code"] {
+  font-weight: 600;
+}
+
+/* Mensaje de error mejorado */
+.fv-help-block {
+  color: var(--bs-danger);
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+/* Botón de eliminar cuenta */
+.btn-light-danger:hover {
+  background-color: var(--bs-danger) !important;
+  color: white !important;
+}
+
+/* Avatar de usuario */
+.symbol-label {
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991.98px) {
+  .w-lg-500px {
+    width: 100% !important;
+  }
+}
+
+/* Loading state */
+.indicator-progress {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Link styles */
+.link-primary:hover {
+  text-decoration: underline;
+}
+
+/* Alert styles */
+.alert {
+  border-radius: 0.625rem;
+}
+
+/* Form control focus */
+.form-control:focus {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}

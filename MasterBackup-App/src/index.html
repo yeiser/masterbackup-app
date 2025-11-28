@@ -15,6 +15,13 @@
   <!--end::Global Stylesheets Bundle-->
 </head>
 <body id="kt_body" class="header-fixed header-tablet-and-mobile-fixed toolbar-enabled toolbar-fixed aside-enabled aside-fixed" style="--kt-toolbar-height:55px;--kt-toolbar-height-tablet-and-mobile:55px">
+  <!--begin::Page loading(used by the layout when page is being loaded)-->
+  <div id="kt_app_page_loading" class="page-loader flex-column" style="display: none;">
+    <span class="spinner-border text-primary" role="status"></span>
+    <span class="text-muted fs-6 fw-semibold mt-5">Cargando...</span>
+  </div>
+  <!--end::Page loading-->
+  
   <app-root></app-root>
   <script>var hostUrl = "assets/";</script>
   <!--begin::Javascript-->

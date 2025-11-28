@@ -9,6 +9,5 @@ public record RegisterCommand(
     string FirstName,
     string LastName,
     string TenantName,
-    string Subdomain,
     bool EnableTwoFactor
 ) : IRequest<AuthResponseDto>;

@@ -9,8 +9,11 @@ public class TenantDbContextFactory : IDesignTimeDbContextFactory<TenantDbContex
     {
         var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();
 
-        // This connection string is only used for migrations
-        optionsBuilder.UseNpgsql("Host=localhost;Database=tenant_template;Username=postgres;Password=postgres");
+        // Use environment variable for tenant template database
+        var connectionString = Environment.GetEnvironmentVariable("TENANT_TEMPLATE_CONNECTION") 
+            ?? "Host=localhost;Database=tenant_template;Username=postgres;Password=postgres";
+
+        optionsBuilder.UseNpgsql(connectionString);
 
         return new TenantDbContext(optionsBuilder.Options);
     }

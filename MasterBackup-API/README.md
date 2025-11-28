@@ -69,15 +69,14 @@ MasterBackup-API/
 │   │   └── Migrations/
 │   ├── Services/                        # Implementaciones
 │   │   ├── EmailService.cs
-│   │   ├── TenantService.cs
-│   │   └── AuthService.cs
+│   │   └── TenantService.cs
 │   └── Middleware/
+│       └── TenantMiddleware.cs          # Resolución de tenant por JWT/API Key
 │
 └── Presentation/                        # 🌐 Capa de Presentación
     └── Controllers/
-        ├── AuthController.cs
-        ├── AuthControllerRefactored.cs  # Ejemplo con MediatR
-        └── UsersController.cs
+        ├── AuthController.cs            # Endpoints de autenticación
+        └── UsersController.cs           # Endpoints de gestión de usuarios
     ├── EmailService.cs        # Servicio de email con Maileroo
     └── TenantService.cs       # Gestión de tenants y bases de datos
 ```
@@ -98,9 +97,29 @@ Crea la base de datos master en PostgreSQL:
 CREATE DATABASE master_saas;
 ```
 
-### 3. Configurar appsettings.json
+### 3. Configurar Variables de Entorno (Recomendado)
 
-Edita el archivo `appsettings.json`:
+La API soporta configuración mediante variables de entorno para facilitar el despliegue en diferentes ambientes.
+
+**Variables disponibles:**
+- `MASTER_DATABASE_CONNECTION`: Connection string para la base de datos master
+- `MASTER_DATABASE_CONNECTION`: Connection string para los logs (opcional, usa master por defecto)
+
+**Configuración rápida con PowerShell:**
+```powershell
+.\set-env.ps1
+```
+
+**O manualmente:**
+```powershell
+$env:MASTER_DATABASE_CONNECTION="Host=localhost;Port=5432;Database=master_saas;Username=postgres;Password=tupassword;Include Error Detail=true"
+```
+
+📖 **Ver documentación completa:** [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md)
+
+### 4. Configurar appsettings.json (Alternativa)
+
+Si no usas variables de entorno, edita el archivo `appsettings.json`:
 
 ```json
 {
@@ -121,11 +140,11 @@ Edita el archivo `appsettings.json`:
 }
 ```
 
-### 4. Ejecutar Migraciones
+### 5. Ejecutar Migraciones
 
 Las migraciones se ejecutan automáticamente al iniciar la aplicación. La base de datos master se crea automáticamente. Las bases de datos de tenants se crean dinámicamente al registrar nuevos tenants.
 
-### 5. Ejecutar la Aplicación
+### 6. Ejecutar la Aplicación
 
 ```bash
 cd MasterBackup-API

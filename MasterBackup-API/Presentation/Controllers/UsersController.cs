@@ -6,6 +6,7 @@ using MasterBackup_API.Application.Features.Auth.Commands;
 using MasterBackup_API.Domain.Enums;
 using MasterBackup_API.Infrastructure.Middleware;
 using System.Security.Claims;
+using FluentValidation;
 
 namespace MasterBackup_API.Presentation.Controllers;
 
@@ -16,11 +17,13 @@ public class UsersController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ILogger<UsersController> _logger;
+    private readonly IValidator<InviteUserDto> _inviteUserValidator;
 
-    public UsersController(IMediator mediator, ILogger<UsersController> logger)
+    public UsersController(IMediator mediator, ILogger<UsersController> logger, IValidator<InviteUserDto> inviteUserValidator)
     {
         _mediator = mediator;
         _logger = logger;
+        _inviteUserValidator = inviteUserValidator;
     }
 
     /// <summary>
@@ -30,9 +33,10 @@ public class UsersController : ControllerBase
     [RoleAuthorization(UserRole.Admin)]
     public async Task<IActionResult> InviteUser([FromBody] InviteUserDto inviteUserDto)
     {
-        if (!ModelState.IsValid)
+        var validationResult = await _inviteUserValidator.ValidateAsync(inviteUserDto);
+        if (!validationResult.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
         }
 
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

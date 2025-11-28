@@ -11,16 +11,19 @@ namespace MasterBackup_API.Application.Features.Auth.Commands;
 
 public class InviteUserCommandHandler : IRequestHandler<InviteUserCommand, bool>
 {
-    private readonly ITenantService _tenantService;
+    private readonly MasterDbContext _masterContext;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
     private readonly ILogger<InviteUserCommandHandler> _logger;
 
     public InviteUserCommandHandler(
-        ITenantService tenantService,
+        MasterDbContext masterContext,
+        UserManager<ApplicationUser> userManager,
         IEmailService emailService,
         ILogger<InviteUserCommandHandler> logger)
     {
-        _tenantService = tenantService;
+        _masterContext = masterContext;
+        _userManager = userManager;
         _emailService = emailService;
         _logger = logger;
     }
@@ -29,20 +32,17 @@ public class InviteUserCommandHandler : IRequestHandler<InviteUserCommand, bool>
     {
         try
         {
-            var tenantOptions = await _tenantService.GetTenantDbContextOptionsAsync(request.TenantId);
-            using var tenantContext = new TenantDbContext(tenantOptions);
-
-            var userManager = CreateUserManager(tenantContext);
-
-            // Check if user already exists
-            var existingUser = await userManager.FindByEmailAsync(request.Email);
+            // Check if user already exists in master database
+            var existingUser = await _masterContext.Users
+                .FirstOrDefaultAsync(u => u.Email == request.Email && u.TenantId == request.TenantId, cancellationToken);
+            
             if (existingUser != null)
             {
                 return false;
             }
 
             // Check if there's a pending invitation
-            var existingInvitation = await tenantContext.UserInvitations
+            var existingInvitation = await _masterContext.UserInvitations
                 .FirstOrDefaultAsync(i => i.Email == request.Email && !i.IsAccepted, cancellationToken);
 
             if (existingInvitation != null)
@@ -50,7 +50,7 @@ public class InviteUserCommandHandler : IRequestHandler<InviteUserCommand, bool>
                 return false;
             }
 
-            var inviter = await userManager.FindByIdAsync(request.InvitedByUserId);
+            var inviter = await _userManager.FindByIdAsync(request.InvitedByUserId);
 
             var invitation = new UserInvitation
             {
@@ -62,8 +62,8 @@ public class InviteUserCommandHandler : IRequestHandler<InviteUserCommand, bool>
                 ExpiresAt = DateTime.UtcNow.AddDays(7)
             };
 
-            tenantContext.UserInvitations.Add(invitation);
-            await tenantContext.SaveChangesAsync(cancellationToken);
+            _masterContext.UserInvitations.Add(invitation);
+            await _masterContext.SaveChangesAsync(cancellationToken);
 
             await _emailService.SendInvitationEmailAsync(
                 invitation.Email,
@@ -78,31 +78,6 @@ public class InviteUserCommandHandler : IRequestHandler<InviteUserCommand, bool>
             _logger.LogError(ex, "Error inviting user");
             return false;
         }
-    }
-
-    private UserManager<ApplicationUser> CreateUserManager(TenantDbContext context)
-    {
-        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<ApplicationUser>(context);
-        var options = new IdentityOptions();
-        var passwordHasher = new PasswordHasher<ApplicationUser>();
-        var userValidators = new List<IUserValidator<ApplicationUser>> { new UserValidator<ApplicationUser>() };
-        var passwordValidators = new List<IPasswordValidator<ApplicationUser>> { new PasswordValidator<ApplicationUser>() };
-        var keyNormalizer = new UpperInvariantLookupNormalizer();
-        var errors = new IdentityErrorDescriber();
-        var services = new ServiceCollection().BuildServiceProvider();
-        var logger = new Logger<UserManager<ApplicationUser>>(new LoggerFactory());
-
-        return new UserManager<ApplicationUser>(
-            userStore,
-            Microsoft.Extensions.Options.Options.Create(options),
-            passwordHasher,
-            userValidators,
-            passwordValidators,
-            keyNormalizer,
-            errors,
-            services,
-            logger
-        );
     }
 
     private string GenerateSecureToken()

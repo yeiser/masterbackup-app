@@ -15,6 +15,7 @@ namespace MasterBackup_API.Application.Features.Auth.Commands;
 public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResponseDto>
 {
     private readonly MasterDbContext _masterContext;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITenantService _tenantService;
     private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
@@ -22,12 +23,14 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
 
     public RegisterCommandHandler(
         MasterDbContext masterContext,
+        UserManager<ApplicationUser> userManager,
         ITenantService tenantService,
         IEmailService emailService,
         IConfiguration configuration,
         ILogger<RegisterCommandHandler> logger)
     {
         _masterContext = masterContext;
+        _userManager = userManager;
         _tenantService = tenantService;
         _emailService = emailService;
         _configuration = configuration;
@@ -38,45 +41,39 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
     {
         try
         {
-            // Check if subdomain already exists
-            var existingTenant = await _masterContext.Tenants
-                .FirstOrDefaultAsync(t => t.Subdomain == request.Subdomain.ToLower(), cancellationToken);
+            // Check if email already exists
+            var existingUser = await _masterContext.Users
+                .FirstOrDefaultAsync(u => u.Email == request.Email, cancellationToken);
 
-            if (existingTenant != null)
+            if (existingUser != null)
             {
                 return new AuthResponseDto
                 {
                     Success = false,
-                    Message = "Subdomain already exists"
+                    Message = "Email already exists"
                 };
             }
 
-            // Create tenant
+            // Create tenant with API Key
             var tenant = new Tenant
             {
                 Id = Guid.NewGuid(),
                 Name = request.TenantName,
-                Subdomain = request.Subdomain.ToLower(),
+                ApiKey = GenerateApiKey(),
                 ConnectionString = string.Empty
             };
 
             // Create tenant database
             var connectionString = await _tenantService.CreateTenantDatabaseAsync(
                 tenant.Id,
-                tenant.Name,
-                tenant.Subdomain
+                tenant.Name
             );
 
             tenant.ConnectionString = connectionString;
             _masterContext.Tenants.Add(tenant);
             await _masterContext.SaveChangesAsync(cancellationToken);
 
-            // Create user in tenant database
-            var tenantOptions = await _tenantService.GetTenantDbContextOptionsAsync(tenant.Id);
-            using var tenantContext = new TenantDbContext(tenantOptions);
-
-            var userManager = CreateUserManager(tenantContext);
-
+            // Create user in master database
             var user = new ApplicationUser
             {
                 UserName = request.Email,
@@ -89,7 +86,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
                 EmailConfirmed = true
             };
 
-            var result = await userManager.CreateAsync(user, request.Password);
+            var result = await _userManager.CreateAsync(user, request.Password);
 
             if (!result.Succeeded)
             {
@@ -108,6 +105,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
             {
                 Success = true,
                 Token = token,
+                ApiKey = tenant.ApiKey,
+                TenantId = tenant.Id.ToString(),
                 User = new UserDto
                 {
                     Id = user.Id,
@@ -129,29 +128,13 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
         }
     }
 
-    private UserManager<ApplicationUser> CreateUserManager(TenantDbContext context)
+    private string GenerateApiKey()
     {
-        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<ApplicationUser>(context);
-        var options = new IdentityOptions();
-        var passwordHasher = new PasswordHasher<ApplicationUser>();
-        var userValidators = new List<IUserValidator<ApplicationUser>> { new UserValidator<ApplicationUser>() };
-        var passwordValidators = new List<IPasswordValidator<ApplicationUser>> { new PasswordValidator<ApplicationUser>() };
-        var keyNormalizer = new UpperInvariantLookupNormalizer();
-        var errors = new IdentityErrorDescriber();
-        var services = new ServiceCollection().BuildServiceProvider();
-        var logger = new Logger<UserManager<ApplicationUser>>(new LoggerFactory());
-
-        return new UserManager<ApplicationUser>(
-            userStore,
-            Microsoft.Extensions.Options.Options.Create(options),
-            passwordHasher,
-            userValidators,
-            passwordValidators,
-            keyNormalizer,
-            errors,
-            services,
-            logger
-        );
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var random = new Random();
+        var apiKey = new string(Enumerable.Repeat(chars, 64)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
+        return $"mb_{apiKey}";
     }
 
     private string GenerateJwtToken(ApplicationUser user)

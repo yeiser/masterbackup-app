@@ -15,20 +15,20 @@ namespace MasterBackup_API.Application.Features.Auth.Commands;
 public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCommand, AuthResponseDto>
 {
     private readonly MasterDbContext _masterContext;
-    private readonly ITenantService _tenantService;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AcceptInvitationCommandHandler> _logger;
 
     public AcceptInvitationCommandHandler(
         MasterDbContext masterContext,
-        ITenantService tenantService,
+        UserManager<ApplicationUser> userManager,
         IEmailService emailService,
         IConfiguration configuration,
         ILogger<AcceptInvitationCommandHandler> logger)
     {
         _masterContext = masterContext;
-        _tenantService = tenantService;
+        _userManager = userManager;
         _emailService = emailService;
         _configuration = configuration;
         _logger = logger;
@@ -38,76 +38,79 @@ public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCo
     {
         try
         {
-            var allTenants = await _masterContext.Tenants
-                .Where(t => t.IsActive)
-                .ToListAsync(cancellationToken);
+            // Find invitation in master database
+            var invitation = await _masterContext.UserInvitations
+                .FirstOrDefaultAsync(i => i.InvitationToken == request.Token &&
+                                        !i.IsAccepted &&
+                                        i.ExpiresAt > DateTime.UtcNow,
+                                        cancellationToken);
 
-            foreach (var tenant in allTenants)
+            if (invitation == null)
             {
-                var tenantOptions = await _tenantService.GetTenantDbContextOptionsAsync(tenant.Id);
-                using var tenantContext = new TenantDbContext(tenantOptions);
-
-                var invitation = await tenantContext.UserInvitations
-                    .FirstOrDefaultAsync(i => i.InvitationToken == request.Token &&
-                                            !i.IsAccepted &&
-                                            i.ExpiresAt > DateTime.UtcNow,
-                                            cancellationToken);
-
-                if (invitation != null)
+                return new AuthResponseDto
                 {
-                    var userManager = CreateUserManager(tenantContext);
-
-                    var user = new ApplicationUser
-                    {
-                        UserName = invitation.Email,
-                        Email = invitation.Email,
-                        FirstName = request.FirstName,
-                        LastName = request.LastName,
-                        Role = invitation.Role,
-                        TenantId = tenant.Id,
-                        TwoFactorEnabled = request.EnableTwoFactor,
-                        EmailConfirmed = true
-                    };
-
-                    var result = await userManager.CreateAsync(user, request.Password);
-
-                    if (!result.Succeeded)
-                    {
-                        return new AuthResponseDto
-                        {
-                            Success = false,
-                            Message = string.Join(", ", result.Errors.Select(e => e.Description))
-                        };
-                    }
-
-                    invitation.IsAccepted = true;
-                    invitation.AcceptedAt = DateTime.UtcNow;
-                    await tenantContext.SaveChangesAsync(cancellationToken);
-
-                    await _emailService.SendWelcomeEmailAsync(user.Email!, user.FirstName);
-
-                    var token = GenerateJwtToken(user);
-
-                    return new AuthResponseDto
-                    {
-                        Success = true,
-                        Token = token,
-                        User = new UserDto
-                        {
-                            Id = user.Id,
-                            Email = user.Email!,
-                            FirstName = user.FirstName,
-                            LastName = user.LastName,
-                            Role = user.Role.ToString()
-                        }
-                    };
-                }
+                    Success = false,
+                    Message = "Invalid or expired invitation"
+                };
             }
+
+            // Get inviter to find tenant
+            var inviter = await _masterContext.Users
+                .FirstOrDefaultAsync(u => u.Id == invitation.InvitedByUserId, cancellationToken);
+
+            if (inviter == null)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = "Invalid invitation"
+                };
+            }
+
+            // Create user in master database with same tenant as inviter
+            var user = new ApplicationUser
+            {
+                UserName = invitation.Email,
+                Email = invitation.Email,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Role = invitation.Role,
+                TenantId = inviter.TenantId,
+                TwoFactorEnabled = request.EnableTwoFactor,
+                EmailConfirmed = true
+            };
+
+            var result = await _userManager.CreateAsync(user, request.Password);
+
+            if (!result.Succeeded)
+            {
+                return new AuthResponseDto
+                {
+                    Success = false,
+                    Message = string.Join(", ", result.Errors.Select(e => e.Description))
+                };
+            }
+
+            invitation.IsAccepted = true;
+            invitation.AcceptedAt = DateTime.UtcNow;
+            await _masterContext.SaveChangesAsync(cancellationToken);
+
+            await _emailService.SendWelcomeEmailAsync(user.Email!, user.FirstName);
+
+            var token = GenerateJwtToken(user);
 
             return new AuthResponseDto
             {
-                Success = false,
-                Message = "Invalid or expired invitation"
+                Success = true,
+                Token = token,
+                User = new UserDto
+                {
+                    Id = user.Id,
+                    Email = user.Email!,
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    Role = user.Role.ToString()
+                }
             };
         }
         catch (Exception ex)
@@ -119,31 +122,6 @@ public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCo
                 Message = "An error occurred while accepting the invitation"
             };
         }
-    }
-
-    private UserManager<ApplicationUser> CreateUserManager(TenantDbContext context)
-    {
-        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<ApplicationUser>(context);
-        var options = new IdentityOptions();
-        var passwordHasher = new PasswordHasher<ApplicationUser>();
-        var userValidators = new List<IUserValidator<ApplicationUser>> { new UserValidator<ApplicationUser>() };
-        var passwordValidators = new List<IPasswordValidator<ApplicationUser>> { new PasswordValidator<ApplicationUser>() };
-        var keyNormalizer = new UpperInvariantLookupNormalizer();
-        var errors = new IdentityErrorDescriber();
-        var services = new ServiceCollection().BuildServiceProvider();
-        var logger = new Logger<UserManager<ApplicationUser>>(new LoggerFactory());
-
-        return new UserManager<ApplicationUser>(
-            userStore,
-            Microsoft.Extensions.Options.Options.Create(options),
-            passwordHasher,
-            userValidators,
-            passwordValidators,
-            keyNormalizer,
-            errors,
-            services,
-            logger
-        );
     }
 
     private string GenerateJwtToken(ApplicationUser user)

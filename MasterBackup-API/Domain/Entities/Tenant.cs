@@ -12,8 +12,8 @@ public class Tenant
     public string Name { get; set; } = string.Empty;
 
     [Required]
-    [MaxLength(50)]
-    public string Subdomain { get; set; } = string.Empty;
+    [MaxLength(100)]
+    public string ApiKey { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(500)]

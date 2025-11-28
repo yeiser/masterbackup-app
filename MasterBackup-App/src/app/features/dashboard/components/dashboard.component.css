@@ -1,0 +1,26 @@
+/* Dashboard component styles */
+
+.app-header {
+  background-color: #ffffff;
+  border-bottom: 1px solid #e4e6ef;
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+}
+
+.app-container {
+  padding: 0 2rem;
+}
+
+.app-wrapper {
+  padding: 2rem;
+}
+
+@media (max-width: 991.98px) {
+  .app-container {
+    padding: 0 1rem;
+  }
+  
+  .app-wrapper {
+    padding: 1rem;
+  }
+}

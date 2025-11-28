@@ -10,6 +10,7 @@ using MasterBackup_API.Domain.Entities;
 using MasterBackup_API.Infrastructure.Services;
 using MasterBackup_API.Application.Common.Interfaces;
 using MediatR;
+using FluentValidation;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.PostgreSQL;
@@ -33,36 +34,49 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
+    // Get connection string from environment variable or configuration
+    var masterDbConnectionString = Environment.GetEnvironmentVariable("MASTER_DATABASE_CONNECTION") 
+                                    ?? builder.Configuration.GetConnectionString("MasterDatabase")
+                                    ?? throw new Exception("Master database connection string not configured");
+
+    Log.Information("Using database connection: {ConnectionString}", 
+        masterDbConnectionString.Replace(masterDbConnectionString.Split("Password=")[1].Split(";")[0], "***"));
+
     // Add Serilog
-    builder.Host.UseSerilog((context, services, configuration) => configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .WriteTo.Conditional(
-            evt => IsDatabaseAvailable(context.Configuration.GetConnectionString("MasterDatabase")),
-            wt => wt.PostgreSQL(
-                connectionString: context.Configuration.GetConnectionString("MasterDatabase")!,
-                tableName: "Logs",
-                needAutoCreateTable: false,
-                restrictedToMinimumLevel: LogEventLevel.Information,
-                columnOptions: new Dictionary<string, ColumnWriterBase>
-                {
-                    {"Message", new RenderedMessageColumnWriter(NpgsqlDbType.Text)},
-                    {"Level", new LevelColumnWriter(true, NpgsqlDbType.Varchar)},
-                    {"TimeStamp", new TimestampColumnWriter(NpgsqlDbType.TimestampTz)},
-                    {"Exception", new ExceptionColumnWriter(NpgsqlDbType.Text)},
-                    {"Properties", new PropertiesColumnWriter(NpgsqlDbType.Text)},
-                    {"LogEvent", new LogEventSerializedColumnWriter(NpgsqlDbType.Text)}
-                }
+    builder.Host.UseSerilog((context, services, configuration) =>
+    {
+        var serilogConnectionString = Environment.GetEnvironmentVariable("MASTER_DATABASE_CONNECTION") 
+                                      ?? masterDbConnectionString;
+        
+        configuration
+            .ReadFrom.Configuration(context.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .WriteTo.Conditional(
+                evt => IsDatabaseAvailable(serilogConnectionString),
+                wt => wt.PostgreSQL(
+                    connectionString: serilogConnectionString,
+                    tableName: "Logs",
+                    needAutoCreateTable: false,
+                    restrictedToMinimumLevel: LogEventLevel.Information,
+                    columnOptions: new Dictionary<string, ColumnWriterBase>
+                    {
+                        {"Message", new RenderedMessageColumnWriter(NpgsqlDbType.Text)},
+                        {"Level", new LevelColumnWriter(true, NpgsqlDbType.Varchar)},
+                        {"TimeStamp", new TimestampColumnWriter(NpgsqlDbType.TimestampTz)},
+                        {"Exception", new ExceptionColumnWriter(NpgsqlDbType.Text)},
+                        {"Properties", new PropertiesColumnWriter(NpgsqlDbType.Text)},
+                        {"LogEvent", new LogEventSerializedColumnWriter(NpgsqlDbType.Text)}
+                    }
+                )
             )
-        )
-        .WriteTo.File(
-            path: context.Configuration["Serilog:WriteTo:1:Args:path"] ?? "Logs/log-.txt",
-            rollingInterval: RollingInterval.Day,
-            retainedFileCountLimit: 7,
-            restrictedToMinimumLevel: LogEventLevel.Warning
-        )
-    );
+            .WriteTo.File(
+                path: context.Configuration["Serilog:WriteTo:1:Args:path"] ?? "Logs/log-.txt",
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 7,
+                restrictedToMinimumLevel: LogEventLevel.Warning
+            );
+    });
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -77,10 +91,20 @@ builder.Services.AddCors(options =>
 
 // Add Master Database Context
 builder.Services.AddDbContext<MasterDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("MasterDatabase")));
+    options.UseNpgsql(masterDbConnectionString));
 
-// NOTE: Identity is NOT registered globally because we use database-per-tenant architecture.
-// UserManager is created manually in each handler with the appropriate tenant context.
+// Add Identity with MasterDbContext (Users, Roles, etc. are in master DB)
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireLowercase = true;
+    options.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<MasterDbContext>()
+.AddDefaultTokenProviders();
 
 // Add JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new Exception("JWT Key not configured");
@@ -113,10 +137,13 @@ builder.Services.AddHttpClient();
 builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
+// Add FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
 // Add Services
+builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Add Background Services
 builder.Services.AddHostedService<LogCleanupService>();

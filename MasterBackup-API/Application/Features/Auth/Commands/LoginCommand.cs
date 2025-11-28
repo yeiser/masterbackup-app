@@ -3,8 +3,9 @@ using MasterBackup_API.Application.Common.DTOs;
 
 namespace MasterBackup_API.Application.Features.Auth.Commands;
 
-public record LoginCommand(
-    string Email,
-    string Password,
-    string? TwoFactorCode
-) : IRequest<AuthResponseDto>;
+public record LoginCommand(LoginDto Dto) : IRequest<AuthResponseDto>
+{
+    public string Email => Dto.Email;
+    public string Password => Dto.Password;
+    public string? TwoFactorCode => Dto.TwoFactorCode;
+}
