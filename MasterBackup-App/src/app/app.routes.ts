@@ -5,9 +5,10 @@ import { DashboardComponent } from './features/dashboard/components/dashboard/da
 import { ResetPasswordComponent } from './features/reset-password/components/reset-password.component';
 import { ForgotPasswordComponent } from './features/forgot-password/components/forgot-password.component';
 import { WrapperComponent } from './layout/components/wrapper/wrapper.component';
+import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/home', pathMatch: 'full' },
+  { path: '', redirectTo: '/login', pathMatch: 'full' },
   
   // Rutas de autenticación (sin layout)
   { path: 'login', component: LoginComponent },
@@ -19,6 +20,7 @@ export const routes: Routes = [
   {
     path: 'home',
     component: WrapperComponent,
+    canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: DashboardComponent }

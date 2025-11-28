@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { StorageService } from '../../../../core/services/storage.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -11,18 +12,13 @@ import { CommonModule } from '@angular/common';
 export class DashboardComponent implements OnInit {
   userName: string = 'Usuario';
   
-  constructor() {}
+  constructor(private storageService: StorageService) {}
 
   ngOnInit(): void {
-    // Obtener datos del usuario del localStorage o servicio
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        this.userName = `${user.firstName || 'Usuario'} ${user.lastName || ''}`.trim();
-      } catch (e) {
-        console.error('Error parsing user data:', e);
-      }
+    // Obtener datos del usuario del StorageService
+    const user = this.storageService.getCurrentUser();
+    if (user) {
+      this.userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Usuario';
     }
   }
 }
