@@ -8,7 +8,7 @@ import { WrapperComponent } from './layout/components/wrapper/wrapper.component'
 import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: '/login', pathMatch: 'full' },
+  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
   
   // Rutas de autenticación (sin layout)
   { path: 'login', component: LoginComponent },
@@ -18,11 +18,10 @@ export const routes: Routes = [
   
   // Rutas protegidas con layout
   {
-    path: 'home',
+    path: '',
     component: WrapperComponent,
     canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: DashboardComponent }
       // Agregar más rutas aquí
     ]
