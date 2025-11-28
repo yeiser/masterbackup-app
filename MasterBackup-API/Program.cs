@@ -48,27 +48,35 @@ try
         var serilogConnectionString = Environment.GetEnvironmentVariable("MASTER_DATABASE_CONNECTION") 
                                       ?? masterDbConnectionString;
         
+        Log.Information("Configuring Serilog with database: {Connection}", 
+            serilogConnectionString?.Split("Password=")[0] + "Password=***");
+        
+        var columnOptions = new Dictionary<string, ColumnWriterBase>
+        {
+            {"Message", new RenderedMessageColumnWriter(NpgsqlDbType.Text)},
+            {"Level", new LevelColumnWriter(true, NpgsqlDbType.Varchar)},
+            {"TimeStamp", new TimestampColumnWriter(NpgsqlDbType.TimestampTz)},
+            {"Exception", new ExceptionColumnWriter(NpgsqlDbType.Text)},
+            {"Properties", new PropertiesColumnWriter(NpgsqlDbType.Text)},
+            {"LogEvent", new LogEventSerializedColumnWriter(NpgsqlDbType.Text)}
+        };
+        
         configuration
             .ReadFrom.Configuration(context.Configuration)
             .ReadFrom.Services(services)
             .Enrich.FromLogContext()
-            .WriteTo.Conditional(
-                evt => IsDatabaseAvailable(serilogConnectionString),
-                wt => wt.PostgreSQL(
-                    connectionString: serilogConnectionString,
-                    tableName: "Logs",
-                    needAutoCreateTable: false,
-                    restrictedToMinimumLevel: LogEventLevel.Information,
-                    columnOptions: new Dictionary<string, ColumnWriterBase>
-                    {
-                        {"Message", new RenderedMessageColumnWriter(NpgsqlDbType.Text)},
-                        {"Level", new LevelColumnWriter(true, NpgsqlDbType.Varchar)},
-                        {"TimeStamp", new TimestampColumnWriter(NpgsqlDbType.TimestampTz)},
-                        {"Exception", new ExceptionColumnWriter(NpgsqlDbType.Text)},
-                        {"Properties", new PropertiesColumnWriter(NpgsqlDbType.Text)},
-                        {"LogEvent", new LogEventSerializedColumnWriter(NpgsqlDbType.Text)}
-                    }
-                )
+            .Enrich.WithProperty("Application", "MasterBackup-API")
+            .MinimumLevel.Information()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+            .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+            .MinimumLevel.Override("System", LogEventLevel.Warning)
+            .WriteTo.Console()
+            .WriteTo.PostgreSQL(
+                connectionString: serilogConnectionString,
+                tableName: "Logs",
+                needAutoCreateTable: false,
+                restrictedToMinimumLevel: LogEventLevel.Information,
+                columnOptions: columnOptions
             )
             .WriteTo.File(
                 path: context.Configuration["Serilog:WriteTo:1:Args:path"] ?? "Logs/log-.txt",
@@ -76,6 +84,8 @@ try
                 retainedFileCountLimit: 7,
                 restrictedToMinimumLevel: LogEventLevel.Warning
             );
+            
+        Log.Information("Serilog configured successfully");
     });
 
 // Add CORS
@@ -227,23 +237,4 @@ catch (Exception ex)
 finally
 {
     await Log.CloseAndFlushAsync();
-}
-
-// Helper function to check database availability
-static bool IsDatabaseAvailable(string? connectionString)
-{
-    if (string.IsNullOrEmpty(connectionString))
-        return false;
-
-    try
-    {
-        using var connection = new Npgsql.NpgsqlConnection(connectionString);
-        connection.Open();
-        connection.Close();
-        return true;
-    }
-    catch
-    {
-        return false;
-    }
 }
