@@ -209,8 +209,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   private handleLoginSuccess(): void {
-    // Redirigir al dashboard o página principal
-    this.router.navigate(['/dashboard']);
+    // Redirigir al home con dashboard como página inicial
+    this.router.navigate(['/home']);
   }
 
   // Navegación entre pasos

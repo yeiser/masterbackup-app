@@ -1,0 +1,37 @@
+<!--begin::Header-->
+<div id="kt_header" class="header bg-white shadow-sm py-4">
+    <div class="container-xxl d-flex align-items-center justify-content-between">
+        <!--begin::Logo-->
+        <div class="d-flex align-items-center">
+            <img alt="Logo" src="assets/media/logos/logo-1.svg" class="h-40px" />
+        </div>
+        <!--end::Logo-->
+
+        <!--begin::User menu-->
+        <div class="d-flex align-items-center gap-4">
+            <!--begin::User account-->
+            <div class="d-flex align-items-center gap-2">
+                <div class="symbol symbol-40px">
+                    <img src="assets/media/avatars/300-1.jpg" alt="" class="rounded-circle" />
+                </div>
+                <div class="d-flex flex-column">
+                    <a href="#" class="text-gray-800 fw-bold text-hover-primary">Usuario</a>
+                    <span class="text-gray-500 fs-8">Admin</span>
+                </div>
+            </div>
+            <!--end::User account-->
+
+            <!--begin::Logout button-->
+            <button type="button" (click)="logout()" class="btn btn-sm btn-light-danger">
+                <i class="ki-duotone ki-exit-right fs-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                Salir
+            </button>
+            <!--end::Logout button-->
+        </div>
+        <!--end::User menu-->
+    </div>
+</div>
+<!--end::Header-->
