@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { RegisterDto } from '../../../core/models/auth.models';
+import { TextFormatHelper } from '../../../shared/helpers/text-format.helper';
 
 @Component({
   selector: 'app-register',
@@ -12,7 +13,7 @@ import { RegisterDto } from '../../../core/models/auth.models';
   templateUrl: './register.component.html',
   styleUrls: ['./register.component.css']
 })
-export class RegisterComponent implements OnInit {
+export class RegisterComponent implements OnInit, OnDestroy {
   registerForm!: FormGroup;
   errorMessage: string = '';
   successMessage: string = '';
@@ -20,6 +21,9 @@ export class RegisterComponent implements OnInit {
   showPassword: boolean = false;
   showConfirmPassword: boolean = false;
   fieldErrors: Map<string, string> = new Map();
+  private unsubscribeCapitalize?: () => void;
+  private unsubscribeUpperCase?: () => void;
+  private unsubscribeLowerCase?: () => void;
 
   constructor(
     private fb: FormBuilder,
@@ -29,6 +33,9 @@ export class RegisterComponent implements OnInit {
 
   ngOnInit(): void {
     this.initializeForm();
+    this.setupNameCapitalization();
+    this.setupTenantNameUpperCase();
+    this.setupEmailLowerCase();
   }
 
   private initializeForm(): void {
@@ -59,6 +66,37 @@ export class RegisterComponent implements OnInit {
       ]],
       enableTwoFactor: [false]
     }, { validators: this.passwordMatchValidator });
+  }
+
+  /**
+   * Configura la capitalización automática de firstName y lastName
+   */
+  private setupNameCapitalization(): void {
+    this.unsubscribeCapitalize = TextFormatHelper.setupAutoCapitalize(
+      this.registerForm,
+      'firstName',
+      'lastName'
+    );
+  }
+
+  /**
+   * Configura la conversión automática a mayúsculas de tenantName
+   */
+  private setupTenantNameUpperCase(): void {
+    this.unsubscribeUpperCase = TextFormatHelper.setupAutoUpperCase(
+      this.registerForm,
+      'tenantName'
+    );
+  }
+
+  /**
+   * Configura la conversión automática a minúsculas de email
+   */
+  private setupEmailLowerCase(): void {
+    this.unsubscribeLowerCase = TextFormatHelper.setupAutoLowerCase(
+      this.registerForm,
+      'email'
+    );
   }
 
   /**
@@ -232,9 +270,13 @@ export class RegisterComponent implements OnInit {
 
     this.isSubmitting = true;
 
-    // Preparar DTO (sin confirmPassword)
+    // Preparar DTO (sin confirmPassword, nombres en minúsculas, tenantName ya está en mayúsculas)
     const { confirmPassword, ...registerData } = this.registerForm.value;
-    const dto: RegisterDto = registerData;
+    const dto: RegisterDto = TextFormatHelper.convertFieldsToLowerCase(
+      registerData,
+      'firstName',
+      'lastName'
+    );
 
     this.authService.register(dto).subscribe({
       next: (response) => {
@@ -271,5 +313,20 @@ export class RegisterComponent implements OnInit {
    */
   goToLogin(): void {
     this.router.navigate(['/login']);
+  }
+
+  /**
+   * Limpieza de recursos
+   */
+  ngOnDestroy(): void {
+    if (this.unsubscribeCapitalize) {
+      this.unsubscribeCapitalize();
+    }
+    if (this.unsubscribeUpperCase) {
+      this.unsubscribeUpperCase();
+    }
+    if (this.unsubscribeLowerCase) {
+      this.unsubscribeLowerCase();
+    }
   }
 }

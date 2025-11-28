@@ -8,7 +8,7 @@ using MasterBackup_API.Infrastructure.Persistence;
 
 namespace MasterBackup_API.Application.Features.Auth.Commands;
 
-public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordCommand, bool>
+public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordCommand, (bool Success, bool EmailFound)>
 {
     private readonly MasterDbContext _masterContext;
     private readonly ITenantService _tenantService;
@@ -27,67 +27,38 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
         _logger = logger;
     }
 
-    public async Task<bool> Handle(ForgotPasswordCommand request, CancellationToken cancellationToken)
+    public async Task<(bool Success, bool EmailFound)> Handle(ForgotPasswordCommand request, CancellationToken cancellationToken)
     {
         try
         {
-            var allTenants = await _masterContext.Tenants
-                .Where(t => t.IsActive)
-                .ToListAsync(cancellationToken);
+            // Buscar usuario en la base de datos master
+            var user = await _masterContext.Users
+                .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive, cancellationToken);
 
-            foreach (var tenant in allTenants)
+            if (user == null)
             {
-                var tenantOptions = await _tenantService.GetTenantDbContextOptionsAsync(tenant.Id);
-                using var tenantContext = new TenantDbContext(tenantOptions);
-
-                var userManager = CreateUserManager(tenantContext);
-                var user = await userManager.FindByEmailAsync(request.Email);
-
-                if (user != null && user.IsActive)
-                {
-                    var resetToken = GenerateSecureToken();
-                    user.PasswordResetToken = resetToken;
-                    user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
-                    await userManager.UpdateAsync(user);
-
-                    await _emailService.SendPasswordResetEmailAsync(user!, resetToken);
-                    return true;
-                }
+                _logger.LogWarning("Password reset requested for non-existent email: {Email}", request.Email);
+                return (true, false);
             }
 
-            // Return true even if user not found (security best practice)
-            return true;
+            // Generar token de restablecimiento
+            var resetToken = GenerateSecureToken();
+            user.PasswordResetToken = resetToken;
+            user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+            
+            await _masterContext.SaveChangesAsync(cancellationToken);
+
+            // Enviar email con el token
+            await _emailService.SendPasswordResetEmailAsync(user, resetToken);
+            
+            _logger.LogInformation("Password reset email sent to: {Email}", request.Email);
+            return (true, true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during forgot password");
-            return false;
+            _logger.LogError(ex, "Error during forgot password for email: {Email}", request.Email);
+            return (false, false);
         }
-    }
-
-    private UserManager<ApplicationUser> CreateUserManager(TenantDbContext context)
-    {
-        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<ApplicationUser>(context);
-        var options = new IdentityOptions();
-        var passwordHasher = new PasswordHasher<ApplicationUser>();
-        var userValidators = new List<IUserValidator<ApplicationUser>> { new UserValidator<ApplicationUser>() };
-        var passwordValidators = new List<IPasswordValidator<ApplicationUser>> { new PasswordValidator<ApplicationUser>() };
-        var keyNormalizer = new UpperInvariantLookupNormalizer();
-        var errors = new IdentityErrorDescriber();
-        var services = new ServiceCollection().BuildServiceProvider();
-        var logger = new Logger<UserManager<ApplicationUser>>(new LoggerFactory());
-
-        return new UserManager<ApplicationUser>(
-            userStore,
-            Microsoft.Extensions.Options.Options.Create(options),
-            passwordHasher,
-            userValidators,
-            passwordValidators,
-            keyNormalizer,
-            errors,
-            services,
-            logger
-        );
     }
 
     private string GenerateSecureToken()

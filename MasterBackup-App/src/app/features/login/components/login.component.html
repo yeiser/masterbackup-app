@@ -31,7 +31,7 @@
 									</div>
 									<div class="flex-grow-1">
 										<a class="text-gray-900 fw-bold text-hover-primary fs-6">
-											{{ getAccountDisplayName(account) }}
+											{{ getAccountDisplayName(account) | capitalize }}
 										</a>
 										<span class="text-muted fw-semibold d-block fs-7">{{ account.email }}</span>
 									</div>
@@ -39,7 +39,7 @@
 											class="btn btn-icon btn-sm btn-light-danger"
 											(click)="removeSavedAccount($event, account)"
 											title="Eliminar cuenta">
-										<i class="ki-duotone ki-cross fs-2">
+										<i class="fa fa-trash fs-2">
 											<span class="path1"></span>
 											<span class="path2"></span>
 										</i>
@@ -69,6 +69,18 @@
 							</div>
 
 							<form [formGroup]="emailForm" (ngSubmit)="onEmailSubmit()" class="form w-100">
+
+                <div *ngIf="errorMessage" class="alert alert-danger mb-8">
+									<div class="d-flex align-items-center">
+										<i class="ki-duotone ki-information-5 fs-2x text-danger me-3">
+											<span class="path1"></span>
+											<span class="path2"></span>
+											<span class="path3"></span>
+										</i>
+										<div class="flex-grow-1">{{ errorMessage }}</div>
+									</div>
+								</div>
+
 								<div class="fv-row mb-8">
 									<label class="form-label fs-6 fw-bolder text-gray-900">Email</label>
 									<input class="form-control bg-transparent" 
@@ -82,17 +94,6 @@
 											<span *ngIf="emailForm.get('email')?.errors?.['required']">El email es requerido</span>
 											<span *ngIf="emailForm.get('email')?.errors?.['email']">Ingresa un email válido</span>
 										</div>
-									</div>
-								</div>
-
-								<div *ngIf="errorMessage" class="alert alert-danger mb-8">
-									<div class="d-flex align-items-center">
-										<i class="ki-duotone ki-information-5 fs-2x text-danger me-3">
-											<span class="path1"></span>
-											<span class="path2"></span>
-											<span class="path3"></span>
-										</i>
-										<div class="flex-grow-1">{{ errorMessage }}</div>
 									</div>
 								</div>
 
@@ -124,6 +125,18 @@
 							</div>
 
 							<form [formGroup]="passwordForm" (ngSubmit)="onPasswordSubmit()" class="form w-100">
+
+                <div *ngIf="errorMessage" class="alert alert-danger mb-8">
+									<div class="d-flex align-items-center">
+										<i class="ki-duotone ki-information-5 fs-2x text-danger me-3">
+											<span class="path1"></span>
+											<span class="path2"></span>
+											<span class="path3"></span>
+										</i>
+										<div class="flex-grow-1">{{ errorMessage }}</div>
+									</div>
+								</div>
+
 								<div class="fv-row mb-8">
 									<label class="form-label fs-6 fw-bolder text-gray-900">Contraseña</label>
 									<input class="form-control bg-transparent" 
@@ -137,17 +150,6 @@
 											<span *ngIf="passwordForm.get('password')?.errors?.['required']">La contraseña es requerida</span>
 											<span *ngIf="passwordForm.get('password')?.errors?.['minlength']">Mínimo 6 caracteres</span>
 										</div>
-									</div>
-								</div>
-
-								<div *ngIf="errorMessage" class="alert alert-danger mb-8">
-									<div class="d-flex align-items-center">
-										<i class="ki-duotone ki-information-5 fs-2x text-danger me-3">
-											<span class="path1"></span>
-											<span class="path2"></span>
-											<span class="path3"></span>
-										</i>
-										<div class="flex-grow-1">{{ errorMessage }}</div>
 									</div>
 								</div>
 
@@ -238,19 +240,20 @@
 						<!-- Botón para regresar -->
 						<div *ngIf="canGoBack" class="text-center">
 							<button type="button" 
-									class="btn btn-icon btn-primary"
+									class="btn btn-link btn-color-success btn-active-color-primary me-5 mb-2"
 									(click)="goBack()">
 								<i class="fa fa-angle-left fs-2 me-2">
 									<span class="path1"></span>
 									<span class="path2"></span>
 								</i>
+                Regresar
 							</button>
 						</div>
 
 						<!-- Footer -->
 						<div class="text-gray-500 text-center fw-semibold fs-6 mt-10">
 							¿No tienes una cuenta?
-							<a routerLink="/register" class="link-primary">Regístrate aquí</a>
+							<a routerLink="/register" class="link-success">Regístrate aquí</a>
 						</div>
 						
 					</div>

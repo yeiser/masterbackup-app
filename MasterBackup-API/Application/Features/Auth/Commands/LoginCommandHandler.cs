@@ -43,7 +43,6 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
 
             // Find user by email (email must be unique globally)
             var user = await _masterContext.Users
-                .Include(u => u)
                 .FirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive, cancellationToken);
 
             if (user == null)
@@ -52,7 +51,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
                 return new AuthResponseDto
                 {
                     Success = false,
-                    Message = "Invalid credentials"
+                    Message = "Credenciales inválidas"
                 };
             }
 
@@ -64,7 +63,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
                 return new AuthResponseDto
                 {
                     Success = false,
-                    Message = "Invalid credentials"
+                    Message = "Credenciales inválidas"
                 };
             }
 

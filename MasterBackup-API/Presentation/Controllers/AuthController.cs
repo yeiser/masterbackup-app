@@ -161,9 +161,19 @@ public class AuthController : ControllerBase
 
         var command = new ForgotPasswordCommand(forgotPasswordDto.Email);
 
-        await _mediator.Send(command);
+        var (success, emailFound) = await _mediator.Send(command);
 
-        return Ok(new { message = "Si tu correo existe, recibirás un enlace para restablecer tu contraseña" });
+        if (!success)
+        {
+            return StatusCode(500, new { success = false, message = "Error al procesar la solicitud" });
+        }
+
+        if (!emailFound)
+        {
+            return NotFound(new { success = false, message = "No existe una cuenta registrada con este correo electrónico" });
+        }
+
+        return Ok(new { success = true, message = "Se ha enviado un correo con las instrucciones para restablecer tu contraseña" });
     }
 
     /// <summary>
@@ -178,7 +188,7 @@ public class AuthController : ControllerBase
             return BadRequest(new { errors = validationResult.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage }) });
         }
 
-        var command = new ResetPasswordCommand(resetPasswordDto.Email, resetPasswordDto.Token, resetPasswordDto.NewPassword);
+        var command = new ResetPasswordCommand("", resetPasswordDto.Token, resetPasswordDto.NewPassword);
 
         var result = await _mediator.Send(command);
 

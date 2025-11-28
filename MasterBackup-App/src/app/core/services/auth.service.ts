@@ -168,4 +168,24 @@ export class AuthService {
   getCurrentUser(): any {
     return this.currentUserSubject.value;
   }
+
+  /**
+   * Solicitar restablecimiento de contraseña
+   */
+  forgotPassword(email: string): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.apiUrl}/auth/forgot-password`,
+      { email }
+    );
+  }
+
+  /**
+   * Restablecer contraseña con token
+   */
+  resetPassword(token: string, newPassword: string): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(
+      `${this.apiUrl}/auth/reset-password`,
+      { token, newPassword }
+    );
+  }
 }

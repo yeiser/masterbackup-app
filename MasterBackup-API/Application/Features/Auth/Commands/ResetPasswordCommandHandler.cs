@@ -27,66 +27,43 @@ public class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordCommand,
     {
         try
         {
-            var allTenants = await _masterContext.Tenants
-                .Where(t => t.IsActive)
-                .ToListAsync(cancellationToken);
+            // Buscar usuario por token en lugar de email
+            var user = await _masterContext.Users
+                .FirstOrDefaultAsync(u => 
+                    u.PasswordResetToken == request.Token && 
+                    u.IsActive,
+                    cancellationToken);
 
-            foreach (var tenant in allTenants)
+            if (user == null)
             {
-                var tenantOptions = await _tenantService.GetTenantDbContextOptionsAsync(tenant.Id);
-                using var tenantContext = new TenantDbContext(tenantOptions);
-
-                var userManager = CreateUserManager(tenantContext);
-                var user = await userManager.FindByEmailAsync(request.Email);
-
-                if (user != null &&
-                    user.PasswordResetToken == request.Token &&
-                    user.PasswordResetTokenExpiry > DateTime.UtcNow)
-                {
-                    var token = await userManager.GeneratePasswordResetTokenAsync(user);
-                    var result = await userManager.ResetPasswordAsync(user, token, request.NewPassword);
-
-                    if (result.Succeeded)
-                    {
-                        user.PasswordResetToken = null;
-                        user.PasswordResetTokenExpiry = null;
-                        await userManager.UpdateAsync(user);
-                        return true;
-                    }
-                }
+                _logger.LogWarning("Password reset attempted with invalid token");
+                return false;
             }
 
-            return false;
+            // Verificar que el token no haya expirado
+            if (user.PasswordResetTokenExpiry == null || user.PasswordResetTokenExpiry < DateTime.UtcNow)
+            {
+                _logger.LogWarning("Password reset attempted with expired token for user: {Email}", user.Email);
+                return false;
+            }
+
+            // Hash de la nueva contraseña
+            var passwordHasher = new PasswordHasher<ApplicationUser>();
+            user.PasswordHash = passwordHasher.HashPassword(user, request.NewPassword);
+            
+            // Limpiar el token de restablecimiento
+            user.PasswordResetToken = null;
+            user.PasswordResetTokenExpiry = null;
+
+            await _masterContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Password reset successful for user: {Email}", user.Email);
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during password reset");
             return false;
         }
-    }
-
-    private UserManager<ApplicationUser> CreateUserManager(TenantDbContext context)
-    {
-        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<ApplicationUser>(context);
-        var options = new IdentityOptions();
-        var passwordHasher = new PasswordHasher<ApplicationUser>();
-        var userValidators = new List<IUserValidator<ApplicationUser>> { new UserValidator<ApplicationUser>() };
-        var passwordValidators = new List<IPasswordValidator<ApplicationUser>> { new PasswordValidator<ApplicationUser>() };
-        var keyNormalizer = new UpperInvariantLookupNormalizer();
-        var errors = new IdentityErrorDescriber();
-        var services = new ServiceCollection().BuildServiceProvider();
-        var logger = new Logger<UserManager<ApplicationUser>>(new LoggerFactory());
-
-        return new UserManager<ApplicationUser>(
-            userStore,
-            Microsoft.Extensions.Options.Options.Create(options),
-            passwordHasher,
-            userValidators,
-            passwordValidators,
-            keyNormalizer,
-            errors,
-            services,
-            logger
-        );
     }
 }

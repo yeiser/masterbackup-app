@@ -1,9 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { SavedAccount } from '../../../core/models/auth.models';
 import { AuthService } from '../../../core/services/auth.service';
+import { CapitalizePipe } from '../../../shared/pipes/capitalize.pipe';
+import { TextFormatHelper } from '../../../shared/helpers/text-format.helper';
 
 enum LoginStep {
   SELECT_ACCOUNT = 0,
@@ -15,11 +17,11 @@ enum LoginStep {
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, CapitalizePipe],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, OnDestroy {
   LoginStep = LoginStep;
   currentStep: LoginStep = LoginStep.SELECT_ACCOUNT;
   
@@ -35,6 +37,8 @@ export class LoginComponent implements OnInit {
   
   loading = false;
   errorMessage = '';
+  
+  private unsubscribeEmailLowerCase?: () => void;
 
   constructor(
     private fb: FormBuilder,
@@ -46,6 +50,14 @@ export class LoginComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSavedAccounts();
+    this.setupEmailLowerCase();
+  }
+
+  private setupEmailLowerCase(): void {
+    this.unsubscribeEmailLowerCase = TextFormatHelper.setupAutoLowerCase(
+      this.emailForm,
+      'email'
+    );
   }
 
   private initForms(): void {
@@ -247,5 +259,11 @@ export class LoginComponent implements OnInit {
       return `${account.firstName} ${account.lastName}`;
     }
     return account.email;
+  }
+
+  ngOnDestroy(): void {
+    if (this.unsubscribeEmailLowerCase) {
+      this.unsubscribeEmailLowerCase();
+    }
   }
 }

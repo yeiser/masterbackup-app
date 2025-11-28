@@ -24,31 +24,28 @@ public class EmailService : IEmailService
 
     public async Task SendTwoFactorCodeAsync(ApplicationUser user, string code)
     {
-        var subject = "Tu Código de Autenticación de Dos Factores";
-        var htmlBody = $@"
-            <h2>Autenticación de Dos Factores</h2>
-            <p>Tu código de verificación es: <strong>{code}</strong></p>
-            <p>Este código expirará en 10 minutos.</p>
-            <p>Si no solicitaste este código, por favor ignora este correo.</p>
-        ";
+        var subject = "Tu código de verificación de seguridad 2FA";
+        var templateData = new Dictionary<string, string>
+        {
+            { "USERNAME", $"{user.FirstName} {user.LastName}" },
+            { "CODIGO", code }
+        };
 
-        await SendEmailAsync(user, subject, htmlBody);
+        await SendEmailAsync(user, subject, null, "4533",  templateData);
     }
 
     public async Task SendPasswordResetEmailAsync(ApplicationUser user, string resetToken)
     {
-        var resetUrl = $"{_configuration["AppUrl"]}/reset-password?token={resetToken}&email={user.Email}";
-        var subject = "Restablecer tu Contraseña";
-        var htmlBody = $@"
-            <h2>Solicitud de Restablecimiento de Contraseña</h2>
-            <p>Solicitaste restablecer tu contraseña.</p>
-            <p>Haz clic en el enlace de abajo para restablecer tu contraseña:</p>
-            <p><a href='{resetUrl}'>Restablecer Contraseña</a></p>
-            <p>Este enlace expirará en 1 hora.</p>
-            <p>Si no solicitaste esto, por favor ignora este correo.</p>
-        ";
+        var encodedToken = Uri.EscapeDataString(resetToken);
+        var resetUrl = $"{_configuration["AppUrl"]}/reset-password?token={encodedToken}";
+        var subject = "Recupera tu contraseña de manera segura";
+        var templateData = new Dictionary<string, string>
+        {
+            { "USERNAME", $"{user.FirstName} {user.LastName}" },
+            { "URL", resetUrl }
+        };
 
-        await SendEmailAsync(user, subject, htmlBody);
+        await SendEmailAsync(user, subject, null, "4539", templateData);
     }
 
     public async Task SendInvitationEmailAsync(ApplicationUser user, string invitationToken, string inviterName)
