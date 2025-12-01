@@ -1,0 +1,77 @@
+.worker-detail-panel {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Card Styling */
+.card {
+  border-radius: 0.625rem;
+}
+
+/* Symbol Styling */
+.symbol-label {
+  border-radius: 0.625rem;
+}
+
+/* Badge Spacing */
+.badge {
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Stats Cards */
+.card-flush {
+  border: 0;
+  border-radius: 0.625rem;
+}
+
+.card-flush .card-body {
+  padding: 1.5rem;
+}
+
+/* Separator */
+.separator {
+  border-top: 1px dashed #e4e6ef;
+}
+
+/* Button Styling */
+.btn-icon {
+  width: 35px;
+  height: 35px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* Font Monospace */
+.font-monospace {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+/* Responsive */
+@media (max-width: 767.98px) {
+  .card-body {
+    padding: 1rem;
+  }
+  
+  .symbol-45px {
+    width: 35px !important;
+    height: 35px !important;
+  }
+  
+  .fs-2 {
+    font-size: 1.5rem !important;
+  }
+}

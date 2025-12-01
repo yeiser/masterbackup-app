@@ -1,1 +1,596 @@
-<p>databases works!</p>
+<!-- Content -->
+<div id="kt_content_container" class="container-xxl">
+  <!-- Card -->
+  <div class="card">
+    <!-- Card header -->
+    <div class="card-header border-0 pt-6 pb-6">
+      <!-- Card toolbar -->
+      <div class="card-toolbar">
+        <div
+          class="d-flex justify-content-between gap-2"
+          data-kt-customer-table-toolbar="base"
+        >
+        <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            (click)="openCreateModal()"
+          >
+            <i class="fa fa-plus"></i>
+            Nueva Conexión
+          </button>
+          <button
+            type="button"
+            class="btn btn-light-primary btn-sm"
+            (click)="refresh()"
+            [disabled]="isLoading"
+          >
+            <i class="fa fa-sync" [class.fa-spin]="isLoading"></i>
+            Actualizar
+          </button>
+          
+        </div>
+      </div>
+    </div>
+    <!-- Card body -->
+    <div class="card-body pt-0">
+        <!-- No connections -->
+      <div *ngIf="!isLoading && filteredConnections.length === 0" class="text-center py-10">
+        <img src="assets/media/icons/duotune/general/gen002.svg" height="150"/>
+        <h3 class="text-gray-600">No hay conexiones disponibles</h3>
+      </div>
+      <!--begin::Navbar-->
+      <div
+        *ngFor="let connection of filteredConnections"
+        class="card mb-5 mb-xl-10 border-2 shadow-sm"
+      >
+        <div class="card-body pt-9 pb-0">
+          <!--begin::Details-->
+          <div class="d-flex flex-wrap flex-sm-nowrap mb-3">
+            <!--begin: Pic-->
+            <div class="me-7 mb-4">
+              <div
+                class="symbol symbol-75px symbol-lg-75px symbol-fixed position-relative"
+              >
+                <img
+                  src="assets/media/icons/databases/postgresql-96.png"
+                  alt="image"
+                />
+                <div
+                  class="position-absolute translate-middle bottom-0 start-100 mb-6 rounded-circle border border-4 border-white h-25px w-25px"
+                  [ngClass]="connection.isActive ? 'bg-success' : 'bg-danger'"
+                ></div>
+              </div>
+            </div>
+            <!--end::Pic-->
+            <!--begin::Info-->
+            <div class="flex-grow-1">
+              <!--begin::Title-->
+              <div
+                class="d-flex justify-content-between align-items-start flex-wrap mb-2"
+              >
+                <!--begin::User-->
+                <div class="d-flex flex-column">
+                  <!--begin::Name-->
+                  <div class="d-flex align-items-center mb-2">
+                    <span class="text-gray-900 fs-2 fw-bolder me-5">{{
+                      connection.name
+                    }}</span>
+                    
+                    <!-- Estado: Probando -->
+                    <span
+                      *ngIf="testingConnectionId === connection.id"
+                      class="badge badge-light-primary"
+                    >
+                      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Probando conexión...
+                    </span>
+                    
+                    <!-- Estado: Última prueba -->
+                    <span
+                      *ngIf="connection.lastTestedAt && testingConnectionId !== connection.id"
+                      class="badge"
+                      [ngClass]="
+                        connection.lastTestSuccessful
+                          ? 'badge-light-success'
+                          : 'badge-light-danger'
+                      "
+                    >
+                      
+                      {{
+                        connection.lastTestSuccessful
+                          ? "Conexión exitosa"
+                          : "Conexión fallida"
+                      }}
+                    </span>
+                    
+                    <!-- Estado: Sin probar -->
+                    <span
+                      *ngIf="!connection.lastTestedAt && testingConnectionId !== connection.id"
+                      class="badge badge-light"
+                    >
+                    
+                      Sin probar
+                    </span>
+                  </div>
+                  <!--end::Name-->
+                  <!--begin::Info-->
+                  <div class="d-flex flex-wrap fw-bold fs-6 mb-4 pe-2">
+                    <span class="d-flex align-items-center text-gray-700 me-8">
+                      <i class="fa fa-cog me-2"></i>
+                      PostgreSQL {{ connection.engineVersion }}</span
+                    >
+                    <span class="d-flex align-items-center text-gray-700 me-8">
+                      <i class="fa fa-desktop me-2"></i>
+                      {{ connection.host }}:{{ connection.port }}
+                    </span>
+                    <span class="d-flex align-items-center text-gray-700 me-8">
+                      <i class="fa fa-user me-2"></i>
+                      {{ connection.username }}
+                    </span>
+                    <span class="d-flex align-items-center text-gray-700 me-8">
+                      <i class="fa fa-database me-2"></i>
+                      {{ connection.database }}
+                    </span>
+                  </div>
+                  <!--end::Info-->
+                  <!--begin::Info-->
+                  <div class="d-flex flex-wrap fw-bold fs-7 mb-4 pe-2">
+                    <span class="d-flex align-items-center text-gray-400 me-5">
+                      Descripción: {{ connection.description }}
+                    </span>
+                  </div>
+                  <!--end::Info-->
+                  <!--begin::Info-->
+                  <div class="d-flex flex-wrap fw-bold fs-7 mb-4 pe-2">
+                    <span
+                      *ngIf="connection.lastTestedAt"
+                      class="d-flex align-items-center text-gray-400 me-5"
+                    >
+                      Última prueba:
+                      {{ connection.lastTestedAt | relativeTime }}
+                    </span>
+                  </div>
+                  <!--end::Info-->
+                  <!--begin::Info-->
+                  <div
+                    *ngIf="connection.lastTestedAt"
+                    class="d-flex flex-wrap fw-bold fs-7 mb-4 pe-2"
+                  >
+                    <span class="d-flex align-items-center text-gray-400 me-5">
+                      Resultado:
+                    </span>
+                    <span
+                      [ngClass]="
+                        connection.lastTestSuccessful
+                          ? 'text-success'
+                          : 'text-danger'
+                      "
+                    >
+                      {{ connection.lastTestStatus }}
+                    </span>
+                  </div>
+                  <!--end::Info-->
+                  <!--begin::Status-->
+                  <div class="d-flex flex-wrap fw-bold fs-7 mb-4 pe-2">
+                    <div
+                      class="form-check form-switch form-check-custom form-check-solid"
+                    >
+                      <input
+                        class="form-check-input h-20px w-30px"
+                        type="checkbox"
+                        [checked]="connection.isActive"
+                        (change)="toggleActive(connection)"
+                        [id]="'status_card_' + connection.id"
+                      />
+                      <label
+                        class="form-check-label fs-7 fw-semibold"
+                        [for]="'status_card_' + connection.id"
+                      >
+                        {{ connection.isActive ? "Activa" : "Inactiva" }}
+                      </label>
+                    </div>
+                  </div>
+                  <!--end::Status-->
+                </div>
+                <!--end::User-->
+                <!--begin::Actions-->
+                <div class="d-flex my-4">
+                  <!--begin::Menu-->
+                  <div class="me-0">
+                    <button
+                      class="btn btn-sm btn-icon btn-bg-light btn-active-color-primary"
+                      data-kt-menu-trigger="click"
+                      data-kt-menu-placement="bottom-end"
+                    >
+                    
+                      <i class="bi bi-three-dots fs-3"></i>
+                    </button>
+                    <!--begin::Menu-->
+                    <div
+                      class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-200px py-4"
+                      data-kt-menu="true"
+                    >
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3">
+                        <a 
+                          href="javascript:void(0)" 
+                          class="menu-link px-3"
+                          (click)="testConnection(connection.id)"
+                          [class.disabled]="testingConnectionId === connection.id"
+                        >
+                          <span *ngIf="testingConnectionId !== connection.id">
+                            <i class="fa fa-check-circle text-success me-2"></i>
+                            Probar Conexión
+                          </span>
+                          <span *ngIf="testingConnectionId === connection.id">
+                            <span class="spinner-border spinner-border-sm text-primary me-2"></span>
+                            Probando...
+                          </span>
+                        </a>
+                      </div>
+                      <!--end::Menu item-->
+
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3">
+                        <a 
+                          href="javascript:void(0)" 
+                          class="menu-link px-3"
+                          (click)="openEditModal(connection)"
+                        >
+                          <i class="fa fa-edit text-primary me-2"></i>
+                          Editar
+                        </a>
+                      </div>
+                      <!--end::Menu item-->
+
+                      <!--begin::Menu separator-->
+                      <div class="separator my-2"></div>
+                      <!--end::Menu separator-->
+
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3">
+                        <a 
+                          href="javascript:void(0)" 
+                          class="menu-link px-3"
+                          (click)="confirmDelete(connection)"
+                        >
+                          <i class="fa fa-trash text-danger me-2"></i>
+                          Eliminar
+                        </a>
+                      </div>
+                      <!--end::Menu item-->
+                    </div>
+                    <!--end::Menu-->
+                  </div>
+                  <!--end::Menu-->
+                </div>
+                <!--end::Actions-->
+              </div>
+              <!--end::Title-->
+            </div>
+            <!--end::Info-->
+          </div>
+          <!--end::Details-->
+        </div>
+      </div>
+      <!--end::Navbar-->
+
+
+      <!-- Loading spinner -->
+      <div *ngIf="isLoading" class="text-center py-10">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Formulario -->
+<div class="modal fade" id="formModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="fw-bold">
+          {{ isEditMode ? "Editar Conexión" : "Nueva Conexión" }}
+        </h2>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+
+      <form [formGroup]="connectionForm" (ngSubmit)="saveConnection()">
+        <div class="modal-body py-10 px-lg-17">
+          <!-- Alert de Metronic -->
+          <div
+            *ngIf="showAlert"
+            class="alert alert-dismissible bg-light-{{
+              alertType
+            }} border border-{{
+              alertType
+            }} d-flex flex-column flex-sm-row w-100 p-5 mb-10"
+          >
+            <i
+              class="fa fa-info-circle fs-2hx text-{{
+                alertType
+              }} me-4 mb-5 mb-sm-0"
+            >
+              <span class="path1"></span>
+              <span class="path2"></span>
+              <span class="path3"></span>
+            </i>
+            <div class="d-flex flex-column pe-0 pe-sm-10">
+              <span class="flex-grow-1">{{ alertMessage }}</span>
+            </div>
+          </div>
+
+          <div class="scroll-y me-n7 pe-7" style="max-height: 500px">
+            <!-- Nombre -->
+            <div class="fv-row mb-7">
+              <label class="required fs-6 fw-semibold mb-2">Nombre</label>
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="name"
+                placeholder="Ej: Servidor Producción"
+                [class.is-invalid]="isFieldInvalid('name')"
+              />
+              <div class="invalid-feedback" *ngIf="isFieldInvalid('name')">
+                {{ getErrorMessage("name") }}
+              </div>
+            </div>
+
+            <!-- Descripción -->
+            <div class="fv-row mb-7">
+              <label class="fs-6 fw-semibold mb-2">Descripción</label>
+              <textarea
+                class="form-control form-control-solid"
+                formControlName="description"
+                rows="3"
+                placeholder="Descripción opcional"
+                [class.is-invalid]="isFieldInvalid('description')"
+              ></textarea>
+              <div
+                class="invalid-feedback"
+                *ngIf="isFieldInvalid('description')"
+              >
+                {{ getErrorMessage("description") }}
+              </div>
+            </div>
+
+            <!-- Tipo de BD -->
+            <div class="fv-row mb-7">
+              <label class="required fs-6 fw-semibold mb-2"
+                >Tipo de Base de Datos</label
+              >
+              <select
+                class="form-select form-select-solid"
+                formControlName="type"
+                [class.is-invalid]="isFieldInvalid('type')"
+              >
+                <option *ngFor="let type of databaseTypes" [value]="type.value">
+                  {{ type.label }}
+                </option>
+              </select>
+              <div class="invalid-feedback" *ngIf="isFieldInvalid('type')">
+                {{ getErrorMessage("type") }}
+              </div>
+            </div>
+
+            <!-- Host y Puerto -->
+            <div class="row mb-7">
+              <div class="col-md-8">
+                <label class="required fs-6 fw-semibold mb-2">Host</label>
+                <input
+                  type="text"
+                  class="form-control form-control-solid"
+                  formControlName="host"
+                  placeholder="localhost o IP"
+                  [class.is-invalid]="isFieldInvalid('host')"
+                />
+                <div class="invalid-feedback" *ngIf="isFieldInvalid('host')">
+                  {{ getErrorMessage("host") }}
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="required fs-6 fw-semibold mb-2">Puerto</label>
+                <input
+                  type="number"
+                  class="form-control form-control-solid"
+                  formControlName="port"
+                  [class.is-invalid]="isFieldInvalid('port')"
+                />
+                <div class="invalid-feedback" *ngIf="isFieldInvalid('port')">
+                  {{ getErrorMessage("port") }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Base de datos -->
+            <div class="fv-row mb-7">
+              <label class="required fs-6 fw-semibold mb-2"
+                >Nombre de la Base de Datos</label
+              >
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                formControlName="database"
+                placeholder="Nombre de la BD"
+                [class.is-invalid]="isFieldInvalid('database')"
+              />
+              <div class="invalid-feedback" *ngIf="isFieldInvalid('database')">
+                {{ getErrorMessage("database") }}
+              </div>
+            </div>
+
+            <!-- Usuario y Contraseña -->
+            <div class="row mb-7">
+              <div class="col-md-6">
+                <label class="required fs-6 fw-semibold mb-2">Usuario</label>
+                <input
+                  type="text"
+                  class="form-control form-control-solid"
+                  formControlName="username"
+                  placeholder="Usuario de la BD"
+                  [class.is-invalid]="isFieldInvalid('username')"
+                />
+                <div
+                  class="invalid-feedback"
+                  *ngIf="isFieldInvalid('username')"
+                >
+                  {{ getErrorMessage("username") }}
+                </div>
+              </div>
+              <div class="col-md-6">
+                <label
+                  [class.required]="!isEditMode"
+                  class="fs-6 fw-semibold mb-2"
+                >
+                  Contraseña
+                  {{ isEditMode ? "(dejar vacío para no cambiar)" : "" }}
+                </label>
+                <input
+                  type="password"
+                  class="form-control form-control-solid"
+                  formControlName="password"
+                  placeholder="Contraseña"
+                  [class.is-invalid]="isFieldInvalid('password')"
+                />
+                <div
+                  class="invalid-feedback"
+                  *ngIf="isFieldInvalid('password')"
+                >
+                  {{ getErrorMessage("password") }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Configuración avanzada -->
+            <div class="separator separator-dashed my-7"></div>
+            <h4 class="fw-bold mb-5">Configuración Avanzada</h4>
+
+            <!-- SSL Mode -->
+            <div class="fv-row mb-7">
+              <label class="fs-6 fw-semibold mb-2">Modo SSL</label>
+              <select
+                class="form-select form-select-solid"
+                formControlName="sslMode"
+              >
+                <option value="disable">Disable</option>
+                <option value="allow">Allow</option>
+                <option value="prefer">Prefer</option>
+                <option value="require">Require</option>
+                <option value="verify-ca">Verify CA</option>
+                <option value="verify-full">Verify Full</option>
+              </select>
+            </div>
+
+            <!-- Asignación de Worker -->
+            <div class="separator separator-dashed my-7"></div>
+            <h4 class="fw-bold mb-5">Asignación de Worker</h4>
+
+            <!-- Modo de Asignación -->
+            <div class="fv-row mb-7">
+              <label class="fs-6 fw-semibold mb-2">Modo de Asignación</label>
+              <select
+                class="form-select form-select-solid"
+                formControlName="assignmentMode"
+              >
+                <option *ngFor="let mode of workerAssignmentModes" [value]="mode.value">
+                  {{ mode.label }}
+                </option>
+              </select>
+              <div class="form-text">Automático: Se asigna automáticamente. Dedicado: Selecciona un worker específico.</div>
+            </div>
+
+            <!-- Worker Dedicado -->
+            <div class="fv-row mb-7" *ngIf="connectionForm.get('assignmentMode')?.value == 2">
+              <label class="required fs-6 fw-semibold mb-2">Worker Asignado</label>
+              <select
+                class="form-select form-select-solid"
+                formControlName="assignedWorkerId"
+                [class.is-invalid]="isFieldInvalid('assignedWorkerId')"
+              >
+                <option [value]="null" disabled>Seleccionar worker...</option>
+                <option *ngFor="let worker of workers" [value]="worker.id">
+                  {{ worker.name }} - {{ worker.hostname }}
+                </option>
+              </select>
+              <div class="invalid-feedback" *ngIf="isFieldInvalid('assignedWorkerId')">
+                Debes seleccionar un worker cuando el modo es Dedicado
+              </div>
+              <div class="form-text" *ngIf="!isFieldInvalid('assignedWorkerId')">
+                Solo se mostrarán workers activos
+              </div>
+            </div>
+
+            <!-- Tags -->
+            <div class="fv-row mb-7">
+              <label class="fs-6 fw-semibold mb-2">Etiquetas (Tags)</label>
+              <input
+                type="text"
+                class="form-control form-control-solid"
+                placeholder="Ej: produccion, respaldo-diario, cliente-xyz"
+                #tagInput
+                (keydown.enter)="addTag($event, tagInput)"
+              />
+              <div class="form-text">Presiona Enter para agregar una etiqueta</div>
+              <div class="d-flex flex-wrap gap-2 mt-3" *ngIf="connectionForm.get('tags')?.value?.length > 0">
+                <span 
+                  *ngFor="let tag of connectionForm.get('tags')?.value; let i = index"
+                  class="badge badge-light-primary fs-7 d-flex align-items-center"
+                >
+                  {{ tag }}
+                  <i class="fa fa-times ms-2 cursor-pointer" (click)="removeTag(i)"></i>
+                </span>
+              </div>
+            </div>
+
+            <!-- Estado activo -->
+            <div class="fv-row mb-7">
+              <div
+                class="form-check form-switch form-check-custom form-check-solid"
+              >
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  formControlName="isActive"
+                  id="isActiveCheck"
+                />
+                <label
+                  class="form-check-label fw-semibold text-gray-700"
+                  for="isActiveCheck"
+                >
+                  Conexión activa
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer flex-center">
+          <button
+            type="button"
+            class="btn btn-light me-3"
+            data-bs-dismiss="modal"
+          >
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="isLoading">
+            <span *ngIf="!isLoading">{{
+              isEditMode ? "Actualizar" : "Crear"
+            }}</span>
+            <span
+              *ngIf="isLoading"
+              class="spinner-border spinner-border-sm"
+              role="status"
+            ></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

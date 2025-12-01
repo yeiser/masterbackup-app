@@ -549,6 +549,113 @@ export const environment = {
 - Documentar lógica de negocio compleja
 - Mantener CHANGELOG.md
 
+## Objetivo y Alcance del Proyecto
+
+**MasterBackup** es una aplicación SaaS multi-tenant para gestión automatizada de backups de bases de datos con las siguientes características principales:
+
+### Funcionalidades Core
+
+1. **Gestión de Conexiones de Bases de Datos**
+   - Crear, activar, inactivar y editar conexiones
+   - Soportar múltiples tipos de bases de datos (PostgreSQL prioritario)
+   - Validación de conexiones antes de guardar
+
+2. **Programación Flexible de Backups**
+   - Usar Quartz.NET para scheduling
+   - Interfaz amigable con expresiones CRON
+   - Backups programados y backups instantáneos (on-demand)
+
+3. **Ejecución de Backups**
+   - Ejecutar backups inmediatos
+   - Procesar backups programados automáticamente
+   - Integración con RabbitMQ para comunicación con workers
+
+4. **Gestión de Archivos de Backup**
+   - Listar backups realizados con filtros y búsqueda
+   - Descargar backups desde Azure Blob Storage
+   - Eliminar backups obsoletos
+
+5. **Workers Dockerizados**
+   - Workers en red local del cliente con Docker
+   - Precargados con `pg_dump` y `pg_restore`
+   - Consumen mensajes de RabbitMQ por tenant
+   - Actualizan estado via API
+   - Envían notificaciones por email
+
+### Arquitectura de Comunicación
+
+#### Flujo de Backups Programados
+1. Usuario programa backup → API REST
+2. API registra job en Quartz.NET
+3. Quartz dispara job → mensaje a RabbitMQ `{tenantId}.backup.queue`
+4. Worker consume mensaje de su queue específica
+5. Worker actualiza estado en DB via API
+6. BackupStrategyFactory selecciona estrategia (PostgreSQL)
+7. Worker ejecuta backup y sube a Azure Blob Storage
+8. Worker actualiza estado final en DB
+9. Worker envía notificaciones por email
+10. Worker notifica finalización a API
+11. API notifica a frontend via SignalR
+
+#### Flujo de Backups Instantáneos
+1. Usuario solicita backup inmediato → API REST
+2. API envía mensaje directo a RabbitMQ `{tenantId}.backup.queue`
+3. Worker consume mensaje
+4. BackupStrategyFactory selecciona estrategia
+5. Worker ejecuta backup y sube a Azure Blob Storage
+6. Worker actualiza estado en DB via API
+7. Worker envía notificaciones por email
+8. Worker notifica finalización a API
+9. API notifica a frontend via SignalR
+
+### Tecnologías Clave Adicionales
+
+- **Quartz.NET**: Scheduling de jobs de backup
+- **RabbitMQ**: Message broker para comunicación API ↔ Workers
+- **Azure Blob Storage**: Almacenamiento de archivos de backup
+- **SignalR**: Notificaciones en tiempo real a frontend
+- **Docker**: Containerización de workers con pg_dump/pg_restore
+- **PostgreSQL Tools**: pg_dump y pg_restore para backups nativos
+
+### Entidades Adicionales en Master Database
+
+**Base de Datos Master extendida con:**
+- `Users` - Usuarios (ya existe con Identity)
+- `Roles` - Roles de usuarios (parte de Identity)
+- `Tenants` - Tenants con ApiKey y ConnectionString
+- `Logs` - Logs centralizados con Serilog
+- `Notifications` - Notificaciones de la aplicación
+- `SubscriptionPlans` - Planes de suscripción para tenants
+- `Workers` - Registro de workers por tenant con estado
+
+**Base de Datos por Tenant incluirá:**
+- `DatabaseConnections` - Conexiones a bases de datos a respaldar
+- `BackupSchedules` - Programaciones de backups con CRON
+- `BackupExecutions` - Historial de ejecuciones de backups
+- `BackupFiles` - Referencias a archivos en Azure Blob Storage
+- `UserNotificationPreferences` - Preferencias de notificación por usuario
+
+### Patrones de Diseño a Implementar
+
+1. **Strategy Pattern**: `BackupStrategyFactory` para diferentes tipos de BD
+   - `PostgreSQLBackupStrategy`
+   - `MySQLBackupStrategy` (futuro)
+   - `SQLServerBackupStrategy` (futuro)
+
+2. **Repository Pattern**: Acceso a datos abstracto por entidad
+
+3. **Unit of Work**: Transacciones coordinadas en handlers
+
+4. **Factory Pattern**: Creación de estrategias de backup
+
+### Consideraciones de Seguridad
+
+- Resolución de tenant por JWT claim `TenantId` O header `X-API-Key`
+- Workers autenticados con API Key del tenant
+- Credenciales de BD encriptadas en DatabaseConnections
+- Tokens de acceso a Azure Blob Storage con expiración
+- RabbitMQ con queues aisladas por tenant: `{tenantId}.backup.queue`
+
 ## Estado Actual del Proyecto (Noviembre 2025)
 
 ✅ **Completado - Backend:**
@@ -568,17 +675,40 @@ export const environment = {
 - ✅ Compilación exitosa sin errores ni warnings
 
 ✅ **Completado - Frontend:**
-- ✅ Componente de login de 3 pasos implementado
+- ✅ Estructura con Angular 18.2 standalone components
+- ✅ Tema Metronic integrado
+- ✅ Componente de login multi-paso (email → password → 2FA)
+- ✅ Componente de registro con validaciones
+- ✅ Forgot password y reset password completos
 - ✅ Saved accounts en localStorage
 - ✅ AuthService con todos los endpoints
-- ✅ Guards de autenticación
+- ✅ Guards de autenticación (authGuard)
+- ✅ Layout con header, sidebar y footer
+- ✅ Dashboard inicial
+- ✅ Rutas de un solo nivel (/dashboard, no /home/dashboard)
+- ✅ Título dinámico de página con íconos Font Awesome
+- ✅ StorageService para manejo consistente de localStorage
 
-⏳ **Pendiente:**
-- ⏳ Eliminar subdomain del frontend (actualizar componentes)
-- ⏳ Manejar nuevo formato de errores de FluentValidation
-- ⏳ Implementar gestión de respaldos
-- ⏳ Dashboard y estadísticas
+⏳ **Siguiente Fase - Gestión de Backups:**
+- ⏳ Entidades: DatabaseConnections, BackupSchedules, BackupExecutions, BackupFiles
+- ⏳ Integración con Quartz.NET para scheduling
+- ⏳ Integración con RabbitMQ para comunicación con workers
+- ⏳ Integración con Azure Blob Storage
+- ⏳ Workers dockerizados con pg_dump/pg_restore
+- ⏳ BackupStrategyFactory con PostgreSQLBackupStrategy
+- ⏳ Sistema de notificaciones por email
+- ⏳ SignalR para notificaciones en tiempo real
+- ⏳ CRUD de conexiones de bases de datos
+- ⏳ Programación de backups con expresiones CRON amigables
+- ⏳ Ejecución de backups instantáneos
+- ⏳ Listado y gestión de archivos de backup
+- ⏳ Dashboard con estadísticas de backups
+
+⏳ **Pendiente - Funcionalidades Adicionales:**
+- ⏳ Gestión de SubscriptionPlans
+- ⏳ Gestión de Notifications
 - ⏳ Gestión de usuarios por tenant
+- ⏳ Reportes y analytics
 - ⏳ Cobertura de pruebas unitarias e integración
 
 ## Arquitectura Limpia - Código Eliminado

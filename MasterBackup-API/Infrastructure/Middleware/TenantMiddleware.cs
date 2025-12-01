@@ -64,11 +64,44 @@ public class TenantMiddleware
         {
             tenantContext.SetTenant(tenantId.Value, connectionString);
             context.Items["TenantId"] = tenantId.Value.ToString();
+            
+            // Apply pending migrations automatically
+            await ApplyTenantMigrationsAsync(tenantContext, context.RequestServices);
         }
 
         await _next(context);
 
         // Clear tenant context after request
         tenantContext.Clear();
+    }
+
+    private async Task ApplyTenantMigrationsAsync(ITenantContext tenantContext, IServiceProvider serviceProvider)
+    {
+        try
+        {
+            // Create TenantDbContext manually with the current tenant context
+            var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();
+            optionsBuilder.UseNpgsql(tenantContext.ConnectionString);
+            
+            using var tenantDbContext = new TenantDbContext(optionsBuilder.Options, tenantContext);
+            
+            // Check if there are pending migrations
+            var pendingMigrations = await tenantDbContext.Database.GetPendingMigrationsAsync();
+            
+            if (pendingMigrations.Any())
+            {
+                _logger.LogInformation("Applying {Count} pending migration(s) to tenant {TenantId}", 
+                    pendingMigrations.Count(), tenantContext.TenantId);
+                
+                await tenantDbContext.Database.MigrateAsync();
+                
+                _logger.LogInformation("Successfully applied migrations to tenant {TenantId}", tenantContext.TenantId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error applying migrations to tenant {TenantId}", tenantContext.TenantId);
+            // Don't throw - let the request continue even if migrations fail
+        }
     }
 }

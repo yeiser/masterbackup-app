@@ -9,16 +9,24 @@ public class TenantService : ITenantService
 {
     private readonly MasterDbContext _masterContext;
     private readonly IConfiguration _configuration;
+    private readonly ITenantContext _tenantContext;
     private readonly ILogger<TenantService> _logger;
 
     public TenantService(
         MasterDbContext masterContext,
         IConfiguration configuration,
+        ITenantContext tenantContext,
         ILogger<TenantService> logger)
     {
         _masterContext = masterContext;
         _configuration = configuration;
+        _tenantContext = tenantContext;
         _logger = logger;
+    }
+
+    public Guid GetCurrentTenantId()
+    {
+        return _tenantContext.TenantId ?? throw new InvalidOperationException("Tenant ID is not available in current context");
     }
 
     public async Task<DbContextOptions<TenantDbContext>> GetTenantDbContextOptionsAsync(Guid tenantId)
@@ -76,8 +84,9 @@ public class TenantService : ITenantService
             // Run migrations on new tenant database
             var tenantOptionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();
             tenantOptionsBuilder.UseNpgsql(tenantConnectionString);
+            var mockTenantContext = new MockTenantContext(Guid.Empty, tenantConnectionString);
 
-            using (var tenantContext = new TenantDbContext(tenantOptionsBuilder.Options))
+            using (var tenantContext = new TenantDbContext(tenantOptionsBuilder.Options, mockTenantContext))
             {
                 await tenantContext.Database.MigrateAsync();
             }
@@ -91,5 +100,18 @@ public class TenantService : ITenantService
             _logger.LogError(ex, $"Error creating database for tenant: {tenantName}");
             throw;
         }
+    }
+
+    private class MockTenantContext : ITenantContext
+    {
+        public MockTenantContext(Guid tenantId, string connectionString)
+        {
+            TenantId = tenantId;
+            ConnectionString = connectionString;
+        }
+        public Guid? TenantId { get; }
+        public string? ConnectionString { get; }
+        public void SetTenant(Guid tenantId, string connectionString) { }
+        public void Clear() { }
     }
 }

@@ -34,7 +34,8 @@ public class Enable2FACommandHandler : IRequestHandler<Enable2FACommand, bool>
             foreach (var tenant in allTenants)
             {
                 var tenantOptions = await _tenantService.GetTenantDbContextOptionsAsync(tenant.Id);
-                using var tenantContext = new TenantDbContext(tenantOptions);
+                var mockTenantContext = new MockTenantContext(tenant.Id, tenant.ConnectionString);
+                using var tenantContext = new TenantDbContext(tenantOptions, mockTenantContext);
 
                 var userManager = CreateUserManager(tenantContext);
                 var user = await userManager.FindByIdAsync(request.UserId);
@@ -79,5 +80,18 @@ public class Enable2FACommandHandler : IRequestHandler<Enable2FACommand, bool>
             services,
             logger
         );
+    }
+
+    private class MockTenantContext : ITenantContext
+    {
+        public MockTenantContext(Guid tenantId, string connectionString)
+        {
+            TenantId = tenantId;
+            ConnectionString = connectionString;
+        }
+        public Guid? TenantId { get; }
+        public string? ConnectionString { get; }
+        public void SetTenant(Guid tenantId, string connectionString) { }
+        public void Clear() { }
     }
 }

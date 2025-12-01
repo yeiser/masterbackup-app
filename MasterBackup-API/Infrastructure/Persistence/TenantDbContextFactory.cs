@@ -1,10 +1,27 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using MasterBackup_API.Application.Common.Interfaces;
 
 namespace MasterBackup_API.Infrastructure.Persistence;
 
 public class TenantDbContextFactory : IDesignTimeDbContextFactory<TenantDbContext>
 {
+    // Mock TenantContext for design-time operations
+    private class DesignTimeTenantContext : ITenantContext
+    {
+        private readonly string _connectionString;
+
+        public DesignTimeTenantContext(string connectionString)
+        {
+            _connectionString = connectionString;
+        }
+
+        public Guid? TenantId => Guid.Empty;
+        public string? ConnectionString => _connectionString;
+        public void SetTenant(Guid tenantId, string connectionString) { }
+        public void Clear() { }
+    }
+
     public TenantDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();
@@ -15,6 +32,7 @@ public class TenantDbContextFactory : IDesignTimeDbContextFactory<TenantDbContex
 
         optionsBuilder.UseNpgsql(connectionString);
 
-        return new TenantDbContext(optionsBuilder.Options);
+        var tenantContext = new DesignTimeTenantContext(connectionString);
+        return new TenantDbContext(optionsBuilder.Options, tenantContext);
     }
 }

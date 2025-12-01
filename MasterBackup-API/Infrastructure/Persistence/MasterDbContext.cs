@@ -13,6 +13,7 @@ public class MasterDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<ApplicationLog> Logs { get; set; }
     public DbSet<UserInvitation> UserInvitations { get; set; }
+    public DbSet<Worker> Workers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,21 @@ public class MasterDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(e => e.Email);
             entity.HasIndex(e => e.InvitationToken).IsUnique();
             entity.Property(e => e.Role).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<Worker>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => new { e.TenantId, e.Name }).IsUnique();
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.LastHeartbeat);
+            entity.Property(e => e.Status).HasConversion<int>();
+            entity.Property(e => e.Tags).HasColumnType("text[]");
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -1,0 +1,248 @@
+<div class="worker-detail-container">
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando...</span>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error" class="alert alert-danger" role="alert">
+    <i class="fa fa-exclamation-triangle me-2"></i>
+    {{ error }}
+  </div>
+
+  <!-- Worker Details -->
+  <div *ngIf="worker && !isLoading" class="worker-detail">
+    <!-- Header -->
+    <div class="card mb-5">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center">
+            <button type="button" class="btn btn-sm btn-icon btn-light me-3" (click)="onClose()">
+              <i class="fa fa-arrow-left fs-4"></i>
+            </button>
+            <div>
+              <h3 class="card-title mb-1">{{ worker.name }}</h3>
+              <span class="badge fs-7" [ngClass]="getStatusBadgeClass(worker.status)">
+                {{ WorkerStatusLabels[worker.status] }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Section -->
+    <div class="card mb-5">
+      <div class="card-header">
+        <h3 class="card-title">Estado del Worker</h3>
+      </div>
+      <div class="card-body">
+        <div class="row g-4">
+          <!-- Status -->
+          <div class="col-md-3 col-6">
+            <div class="d-flex align-items-center">
+              <div class="symbol symbol-40px me-3">
+                <span class="symbol-label" [ngClass]="'bg-light-' + WorkerStatusColors[worker.status]">
+                  <i [class]="'fa '+ WorkerStatusIcons[worker.status] + ' fs-2 text-' + WorkerStatusColors[worker.status]"></i>
+                </span>
+              </div>
+              <div>
+                <div class="text-gray-600 fs-7">Estado</div>
+                <div class="fw-bold">{{ WorkerStatusLabels[worker.status] }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Status -->
+          <div class="col-md-3 col-6">
+            <div class="d-flex align-items-center">
+              <div class="symbol symbol-40px me-3">
+                <span class="symbol-label" [ngClass]="worker.isActive ? 'bg-light-success' : 'bg-light-danger'">
+                  <i [class]="(worker.isActive ? 'fa fa-check' : 'fa fa-times') + ' fs-2 text-' + (worker.isActive ? 'success' : 'danger')"></i>
+                </span>
+              </div>
+              <div>
+                <div class="text-gray-600 fs-7">Activo</div>
+                <div class="fw-bold">{{ worker.isActive ? 'Sí' : 'No' }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Current Jobs -->
+          <div class="col-md-3 col-6">
+            <div class="d-flex align-items-center">
+              <div class="symbol symbol-40px me-3">
+                <span class="symbol-label bg-light-info">
+                  <i class="fa fa-tasks fs-2 text-info"></i>
+                </span>
+              </div>
+              <div>
+                <div class="text-gray-600 fs-7">Trabajos Actuales</div>
+                <div class="fw-bold">{{ worker.currentActiveJobs }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Heartbeat -->
+          <div class="col-md-3 col-6">
+            <div class="d-flex align-items-center">
+              <div class="symbol symbol-40px me-3">
+                <span class="symbol-label" 
+                      [ngClass]="getHeartbeatStatus(worker.lastHeartbeat) === 'recent' ? 'bg-light-success' : 
+                                 getHeartbeatStatus(worker.lastHeartbeat) === 'warning' ? 'bg-light-warning' : 'bg-light-danger'">
+                  <i class="fa fa-heartbeat fs-2"
+                     [ngClass]="getHeartbeatStatus(worker.lastHeartbeat) === 'recent' ? 'text-success' : 
+                                getHeartbeatStatus(worker.lastHeartbeat) === 'warning' ? 'text-warning' : 'text-danger'"></i>
+                </span>
+              </div>
+              <div>
+                <div class="text-gray-600 fs-7">Último Heartbeat</div>
+                <div class="fw-bold">{{ worker.lastHeartbeat | relativeTime }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Information -->
+    <div class="card mb-5">
+      <div class="card-header">
+        <h3 class="card-title">Información del Sistema</h3>
+      </div>
+      <div class="card-body">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="mb-4">
+              <label class="form-label text-gray-600 fs-7 mb-1">Hostname</label>
+              <div class="fw-bold">{{ worker.hostname || 'N/A' }}</div>
+            </div>
+            <div class="mb-4">
+              <label class="form-label text-gray-600 fs-7 mb-1">Dirección IP</label>
+              <div class="fw-bold">{{ worker.ipAddress || 'N/A' }}</div>
+            </div>
+            <div>
+              <label class="form-label text-gray-600 fs-7 mb-1">Dirección MAC</label>
+              <div class="fw-bold">{{ worker.macAddress || 'N/A' }}</div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="mb-4">
+              <label class="form-label text-gray-600 fs-7 mb-1">Sistema Operativo</label>
+              <div class="fw-bold">{{ worker.osInfo || 'N/A' }}</div>
+            </div>
+            <div class="mb-4">
+              <label class="form-label text-gray-600 fs-7 mb-1">Versión</label>
+              <div class="fw-bold">{{ worker.version || 'N/A' }}</div>
+            </div>
+            <div>
+              <label class="form-label text-gray-600 fs-7 mb-1">ID</label>
+              <div class="fw-bold text-muted small">{{ worker.id }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Capabilities -->
+    <div class="card mb-5">
+      <div class="card-header">
+        <h3 class="card-title">Capacidades</h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-4">
+          <label class="form-label text-gray-600 fs-7 mb-2">Tipos de Base de Datos</label>
+          <div class="d-flex flex-wrap gap-2">
+            <span *ngFor="let dbType of worker.supportedDatabaseTypes" 
+                  class="badge badge-light-primary fs-7">
+              {{ dbType }}
+            </span>
+            <span *ngIf="!worker.supportedDatabaseTypes || worker.supportedDatabaseTypes.length === 0"
+                  class="text-muted">Ninguno</span>
+          </div>
+        </div>
+        <div class="separator my-4"></div>
+        <div>
+          <label class="form-label text-gray-600 fs-7 mb-2">Etiquetas</label>
+          <div class="d-flex flex-wrap gap-2">
+            <span *ngFor="let tag of worker.tags" 
+                  class="badge badge-light-info fs-7">
+              {{ tag }}
+            </span>
+            <span *ngIf="!worker.tags || worker.tags.length === 0"
+                  class="text-muted">Ninguna</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="row g-5 mb-5">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body d-flex align-items-center">
+            <div class="symbol symbol-50px me-4">
+              <span class="symbol-label bg-light-success">
+                <i class="fa fa-check-circle fs-2 text-success"></i>
+              </span>
+            </div>
+            <div class="flex-grow-1">
+              <div class="text-gray-600 fs-7 mb-1">Backups Procesados</div>
+              <div class="fw-bold fs-2">{{ worker.totalBackupsProcessed || 0 }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body d-flex align-items-center">
+            <div class="symbol symbol-50px me-4">
+              <span class="symbol-label bg-light-primary">
+                <i class="fa fa-database fs-2 text-primary"></i>
+              </span>
+            </div>
+            <div class="flex-grow-1">
+              <div class="text-gray-600 fs-7 mb-1">Bytes Procesados</div>
+              <div class="fw-bold fs-2">{{ formatBytes(worker.totalBytesProcessed || 0) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timestamps -->
+    <div class="card mb-5">
+      <div class="card-header">
+        <h3 class="card-title">Fechas</h3>
+      </div>
+      <div class="card-body">
+        <div class="row g-4">
+          <div class="col-md-4">
+            <label class="form-label text-gray-600 fs-7 mb-1">Creado</label>
+            <div class="fw-bold">{{ worker.createdAt | date:'medium' }}</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label text-gray-600 fs-7 mb-1">Actualizado</label>
+            <div class="fw-bold">{{ worker.updatedAt | date:'medium' }}</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label text-gray-600 fs-7 mb-1">Último Heartbeat</label>
+            <div class="fw-bold">{{ worker.lastHeartbeat | date:'medium' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div class="card" *ngIf="worker.description">
+      <div class="card-header">
+        <h3 class="card-title">Descripción</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-gray-800 mb-0">{{ worker.description }}</p>
+      </div>
+    </div>
+  </div>
+</div>

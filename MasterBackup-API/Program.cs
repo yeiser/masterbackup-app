@@ -103,6 +103,20 @@ builder.Services.AddCors(options =>
 builder.Services.AddDbContext<MasterDbContext>(options =>
     options.UseNpgsql(masterDbConnectionString));
 
+// Add Tenant Database Context (will be resolved dynamically by TenantMiddleware)
+builder.Services.AddScoped<TenantDbContext>(serviceProvider =>
+{
+    var tenantContext = serviceProvider.GetRequiredService<ITenantContext>();
+    var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();
+    
+    if (!string.IsNullOrEmpty(tenantContext.ConnectionString))
+    {
+        optionsBuilder.UseNpgsql(tenantContext.ConnectionString);
+    }
+    
+    return new TenantDbContext(optionsBuilder.Options, tenantContext);
+});
+
 // Add Identity with MasterDbContext (Users, Roles, etc. are in master DB)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
@@ -154,6 +168,8 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
+builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
 
 // Add Background Services
 builder.Services.AddHostedService<LogCleanupService>();

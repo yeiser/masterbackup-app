@@ -26,6 +26,14 @@ export class HeaderComponent implements OnInit {
     '/dashboard': { 
       title: 'Dashboard', 
       icon: 'fa-tachometer-alt' 
+    },
+    '/agents': { 
+      title: 'Agentes', 
+      icon: 'fa-server'
+    },
+    '/databases': { 
+      title: 'Bases de Datos', 
+      icon: 'fa-database'
     }
   };
 

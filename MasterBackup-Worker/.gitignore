@@ -1,0 +1,32 @@
+# Ignore build artifacts
+bin/
+obj/
+
+# Ignore user-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Ignore configuration files with secrets
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+
+# Ignore NuGet packages
+*.nupkg
+*.snupkg
+packages/
+
+# Ignore IDE files
+.vs/
+.vscode/
+.idea/
+
+# Ignore logs
+*.log
+logs/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

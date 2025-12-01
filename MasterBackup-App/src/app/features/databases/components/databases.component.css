@@ -1,0 +1,132 @@
+/* Estilos para los íconos de bases de datos */
+.symbol-label i {
+  transition: all 0.3s ease;
+}
+
+/* Hover effect en las filas de la tabla */
+tbody tr {
+  transition: all 0.2s ease;
+}
+
+tbody tr:hover {
+  background-color: #f5f8fa;
+}
+
+/* Estilos para los badges */
+.badge {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Animación para los botones */
+.btn {
+  transition: all 0.2s ease;
+}
+
+/* Estilos para el modal */
+.modal-content {
+  border-radius: 0.625rem;
+}
+
+/* Scroll personalizado para el modal */
+.scroll-y::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-y::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.scroll-y::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.scroll-y::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Estado de carga en botones */
+.btn.disabled,
+.menu-link.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Spinner animation */
+@keyframes spinner-border {
+  to { transform: rotate(360deg); }
+}
+
+.spinner-border {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  vertical-align: text-bottom;
+  border: 0.15em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-border 0.75s linear infinite;
+}
+
+.spinner-border-sm {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-width: 0.1em;
+}
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+
+/* Espaciado para formularios */
+.fv-row {
+  margin-bottom: 1.5rem;
+}
+
+/* Mejorar la apariencia de los inputs inválidos */
+.form-control.is-invalid,
+.form-select.is-invalid {
+  border-color: #f1416c;
+  background-image: none;
+}
+
+.invalid-feedback {
+  display: block;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+/* Estilos para el switch de estado */
+.form-check-input:checked {
+  background-color: #50cd89;
+  border-color: #50cd89;
+}
+
+/* Animación para el ícono de prueba de conexión */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-icon:hover i {
+  animation: spin 0.5s ease-in-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .card-toolbar {
+    margin-top: 1rem;
+  }
+  
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+}

@@ -4,6 +4,8 @@ import { RegisterComponent } from './features/register/components/register.compo
 import { DashboardComponent } from './features/dashboard/components/dashboard/dashboard.component';
 import { ResetPasswordComponent } from './features/reset-password/components/reset-password.component';
 import { ForgotPasswordComponent } from './features/forgot-password/components/forgot-password.component';
+import { DatabasesComponent } from './features/databases/components/databases.component';
+import { WorkersComponent } from './features/workers/component/workers/workers.component';
 import { WrapperComponent } from './layout/components/wrapper/wrapper.component';
 import { authGuard } from './core/guards/auth.guard';
 
@@ -22,7 +24,9 @@ export const routes: Routes = [
     component: WrapperComponent,
     canActivate: [authGuard],
     children: [
-      { path: 'dashboard', component: DashboardComponent }
+      { path: 'dashboard', component: DashboardComponent },
+      { path: 'databases', component: DatabasesComponent },
+      { path: 'agents', component: WorkersComponent }
       // Agregar más rutas aquí
     ]
   }
