@@ -43,6 +43,14 @@ try
     Log.Information("Using database connection: {ConnectionString}", 
         masterDbConnectionString.Replace(masterDbConnectionString.Split("Password=")[1].Split(";")[0], "***"));
 
+    // Get Azure Blob Storage connection string from environment variable or configuration
+    var azureStorageConnectionString = Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING")
+                                        ?? builder.Configuration["AzureStorage:ConnectionString"]
+                                        ?? throw new Exception("Azure Storage connection string not configured");
+
+    Log.Information("Azure Storage configured: {StorageType}", 
+        azureStorageConnectionString.Contains("UseDevelopmentStorage=true") ? "Development Emulator" : "Azure Cloud");
+
     // Add Serilog
     builder.Host.UseSerilog((context, services, configuration) =>
     {
@@ -171,7 +179,15 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
 builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
-builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
+
+// Add Azure Blob Storage Service with connection string from environment variable
+builder.Services.AddSingleton<IBlobStorageService>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<AzureBlobStorageService>>();
+    var containerPrefix = builder.Configuration["AzureStorage:ContainerPrefix"] ?? "backups";
+    return new AzureBlobStorageService(azureStorageConnectionString, containerPrefix, logger);
+});
+
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IBackupSchedulerService, BackupSchedulerService>();
 

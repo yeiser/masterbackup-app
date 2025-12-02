@@ -16,19 +16,19 @@ public class AzureBlobStorageService : IBlobStorageService
     private readonly string _containerPrefix;
 
     public AzureBlobStorageService(
-        IConfiguration configuration, 
+        string connectionString,
+        string containerPrefix,
         ILogger<AzureBlobStorageService> logger)
     {
         _logger = logger;
         
-        var connectionString = configuration["AzureStorage:ConnectionString"];
         if (string.IsNullOrEmpty(connectionString))
         {
-            throw new InvalidOperationException("AzureStorage:ConnectionString is not configured");
+            throw new ArgumentNullException(nameof(connectionString), "Azure Storage connection string cannot be null or empty");
         }
 
         _blobServiceClient = new BlobServiceClient(connectionString);
-        _containerPrefix = configuration["AzureStorage:ContainerPrefix"] ?? "backups";
+        _containerPrefix = containerPrefix ?? "backups";
         
         _logger.LogInformation("AzureBlobStorageService initialized with container prefix: {Prefix}", _containerPrefix);
     }
