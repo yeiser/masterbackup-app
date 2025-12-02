@@ -66,7 +66,10 @@ public class RabbitMQConsumerService : BackgroundService
         _logger.LogInformation("Worker registered with ID: {WorkerId}. Initializing RabbitMQ connection...", _workerConfig.WorkerId);
         
         // NOW we can determine the queue name with the correct TenantId
-        _queueName = $"{_workerConfig.TenantId}.test-connection.queue";
+        // Listen to backup jobs queue
+        _queueName = $"backup.jobs.{_workerConfig.TenantId}";
+        
+        _logger.LogInformation("Worker will consume from queue: {QueueName}", _queueName);
         
         // Initialize RabbitMQ connection
         var factory = new ConnectionFactory
@@ -273,20 +276,22 @@ public class RabbitMQConsumerService : BackgroundService
     {
         _logger.LogDebug("Determining message type for: {Message}", messageJson);
         
-        // Simple heuristic: check if message contains BackupExecutionId or ConnectionId
-        if (messageJson.Contains("BackupExecutionId", StringComparison.OrdinalIgnoreCase))
+        // Simple heuristic: check if message contains JobId and DatabaseConnection (BackupJob)
+        // or ConnectionId (TestConnection)
+        if (messageJson.Contains("\"JobId\"", StringComparison.OrdinalIgnoreCase) && 
+            messageJson.Contains("\"DatabaseConnection\"", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogDebug("Message identified as BackupJob");
+            _logger.LogDebug("Message identified as BackupJob (contains JobId and DatabaseConnection)");
             return "BackupJob";
         }
         
-        if (messageJson.Contains("ConnectionId", StringComparison.OrdinalIgnoreCase))
+        if (messageJson.Contains("\"ConnectionId\"", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogDebug("Message identified as TestConnection");
+            _logger.LogDebug("Message identified as TestConnection (contains ConnectionId)");
             return "TestConnection";
         }
 
-        _logger.LogWarning("Unknown message type. Message does not contain BackupExecutionId or ConnectionId");
+        _logger.LogWarning("Unknown message type. Message does not contain expected fields for BackupJob or TestConnection");
         return "Unknown";
     }
 
