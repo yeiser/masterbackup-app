@@ -59,12 +59,12 @@ public class ConnectionTestService : IConnectionTestService
             var versionString = version?.ToString() ?? "Unknown version";
             _logger.LogInformation("Successfully connected to PostgreSQL: {Version}", versionString);
             
-            return (true, $"✓ Connection successful! PostgreSQL version: {versionString}");
+            return (true, $"Connection successful! PostgreSQL version: {versionString}");
         }
         catch (NpgsqlException ex)
         {
             _logger.LogWarning(ex, "PostgreSQL connection failed: {Message}", ex.Message);
-            return (false, $"✗ PostgreSQL connection failed: {ex.Message}");
+            return (false, $"PostgreSQL connection failed: {ex.Message}");
         }
     }
 

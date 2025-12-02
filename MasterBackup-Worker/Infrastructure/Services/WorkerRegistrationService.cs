@@ -80,7 +80,7 @@ public class WorkerRegistrationService : BackgroundService
                 var osInfo = $"{Environment.OSVersion.Platform} {Environment.OSVersion.Version}";
                 var version = "1.0.0"; // TODO: Get from assembly version
 
-                var (success, workerId, message) = await _apiClient.RegisterWorkerAsync(
+                var (success, workerId, tenantId, message) = await _apiClient.RegisterWorkerAsync(
                     _workerConfig.WorkerName,
                     hostname,
                     osInfo,
@@ -93,11 +93,13 @@ public class WorkerRegistrationService : BackgroundService
                 {
                     _registeredWorkerId = workerId;
                     
-                    // Update worker config with the registered ID
+                    // Update worker config with the registered ID AND TenantId from API
                     _workerConfig.WorkerId = workerId;
+                    _workerConfig.TenantId = tenantId;
                     
                     _logger.LogInformation("✓ {Message}", message);
                     _logger.LogInformation("  Worker ID: {WorkerId}", workerId);
+                    _logger.LogInformation("  Tenant ID: {TenantId}", tenantId);
                     _logger.LogInformation("  Worker Name: {WorkerName}", _workerConfig.WorkerName);
                     
                     return true;

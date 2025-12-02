@@ -11,6 +11,7 @@ using MasterBackup_API.Infrastructure.Services;
 using MasterBackup_API.Application.Common.Interfaces;
 using MediatR;
 using FluentValidation;
+using Quartz;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.PostgreSQL;
@@ -170,6 +171,37 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
 builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
+builder.Services.AddSingleton<IBlobStorageService, AzureBlobStorageService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IBackupSchedulerService, BackupSchedulerService>();
+
+// Add SignalR for real-time notifications
+builder.Services.AddSignalR();
+
+// Add Quartz.NET for backup scheduling
+builder.Services.AddQuartz(q =>
+{
+    // Use Microsoft DI for job creation
+    q.UseMicrosoftDependencyInjectionJobFactory();
+    
+    // Configure JSON serialization for JobDataMap
+    q.UseSimpleTypeLoader();
+    q.UseInMemoryStore();
+    q.UseDefaultThreadPool(tp =>
+    {
+        tp.MaxConcurrency = 10; // Máximo 10 jobs simultáneos
+    });
+});
+
+// Add Quartz hosted service
+builder.Services.AddQuartzHostedService(options =>
+{
+    // Wait for jobs to complete on shutdown
+    options.WaitForJobsToComplete = true;
+    
+    // Start delay to ensure database is ready
+    options.StartDelay = TimeSpan.FromSeconds(5);
+});
 
 // Add Background Services
 builder.Services.AddHostedService<LogCleanupService>();
@@ -236,6 +268,9 @@ app.UseAuthorization();
 app.UseMiddleware<TenantMiddleware>();
 
 app.MapControllers();
+
+// Map SignalR Hub
+app.MapHub<MasterBackup_API.Infrastructure.Hubs.BackupNotificationHub>("/hubs/backup-notifications");
 
 // Ensure Master Database is created
 using (var scope = app.Services.CreateScope())

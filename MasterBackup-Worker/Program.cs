@@ -20,7 +20,7 @@ var configuration = new ConfigurationBuilder()
 var workerConfig = new WorkerConfiguration
 {
     WorkerId = Guid.Empty, // Will be assigned after registration
-    TenantId = Guid.Parse(configuration["Worker:TenantId"] ?? throw new InvalidOperationException("Worker:TenantId not configured")),
+    TenantId = Guid.Empty, // Will be assigned after registration from API
     WorkerName = configuration["Worker:WorkerName"] ?? "Worker-Unnamed",
     ApiKey = configuration["Worker:ApiKey"] ?? throw new InvalidOperationException("Worker:ApiKey not configured"),
     Tags = configuration.GetSection("Worker:Tags").Get<string[]>() ?? Array.Empty<string>(),
@@ -57,6 +57,14 @@ var host = Host.CreateDefaultBuilder(args)
     {
         // Register worker configuration as singleton
         services.AddSingleton(workerConfig);
+
+        // Register HTTP client for API communication
+        services.AddHttpClient<IBackupStatusReporter, BackupStatusReporter>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+            client.DefaultRequestHeaders.Add("X-API-Key", workerConfig.ApiKey);
+            client.Timeout = TimeSpan.FromMinutes(5);
+        });
 
         // Register application services
         services.AddSingleton<IWorkerAuthorizationService, WorkerAuthorizationService>();

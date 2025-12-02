@@ -1,12 +1,12 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { 
   DatabaseConnectionDto, 
   CreateDatabaseConnectionDto, 
   UpdateDatabaseConnectionDto,
   TestConnectionResultDto 
-} from '../../../core/models/database-connection.models';
+} from '../models/database-connection.models';
 import { environment } from '../../../../environments/environment';
 
 @Injectable({
@@ -19,9 +19,11 @@ export class DatabaseConnectionService {
 
   /**
    * Obtener todas las conexiones de base de datos
+   * @param skipLoading Si es true, no muestra el spinner de loading
    */
-  getAllConnections(): Observable<DatabaseConnectionDto[]> {
-    return this.http.get<DatabaseConnectionDto[]>(this.apiUrl);
+  getAllConnections(skipLoading: boolean = false): Observable<DatabaseConnectionDto[]> {
+    const headers = skipLoading ? new HttpHeaders({ 'X-Skip-Loading': 'true' }) : undefined;
+    return this.http.get<DatabaseConnectionDto[]>(this.apiUrl, { headers });
   }
 
   /**
@@ -54,8 +56,11 @@ export class DatabaseConnectionService {
 
   /**
    * Solicitar test de conexión (envía job al Worker via RabbitMQ)
+   * @param id ID de la conexión a probar
+   * @param skipLoading Si es true, no muestra el spinner de loading
    */
-  testConnection(id: string): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/${id}/test`, {});
+  testConnection(id: string, skipLoading: boolean = false): Observable<void> {
+    const headers = skipLoading ? new HttpHeaders({ 'X-Skip-Loading': 'true' }) : undefined;
+    return this.http.post<void>(`${this.apiUrl}/${id}/test`, {}, { headers });
   }
 }

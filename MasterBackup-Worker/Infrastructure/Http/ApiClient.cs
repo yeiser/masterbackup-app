@@ -144,7 +144,7 @@ public class ApiClient : IApiClient
         }
     }
 
-    public async Task<(bool Success, Guid WorkerId, string Message)> RegisterWorkerAsync(
+    public async Task<(bool Success, Guid WorkerId, Guid TenantId, string Message)> RegisterWorkerAsync(
         string name,
         string? hostname,
         string? osInfo,
@@ -179,34 +179,35 @@ public class ApiClient : IApiClient
                 
                 if (result != null)
                 {
-                    _logger.LogInformation("Successfully registered worker. WorkerId: {WorkerId}", result.WorkerId);
-                    return (true, result.WorkerId, result.Message);
+                    _logger.LogInformation("Successfully registered worker. WorkerId: {WorkerId}, TenantId: {TenantId}",
+                        result.WorkerId, result.TenantId);
+                    return (true, result.WorkerId, result.TenantId, result.Message);
                 }
                 
-                return (false, Guid.Empty, "Invalid response from API");
+                return (false, Guid.Empty, Guid.Empty, "Invalid response from API");
             }
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 _logger.LogWarning("Failed to register worker. Status: {StatusCode}, Error: {Error}",
                     response.StatusCode, errorContent);
-                return (false, Guid.Empty, $"Registration failed: {response.StatusCode}");
+                return (false, Guid.Empty, Guid.Empty, $"Registration failed: {response.StatusCode}");
             }
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "HTTP error registering worker");
-            return (false, Guid.Empty, $"HTTP error: {ex.Message}");
+            return (false, Guid.Empty, Guid.Empty, $"HTTP error: {ex.Message}");
         }
         catch (TaskCanceledException ex)
         {
             _logger.LogError(ex, "Timeout registering worker");
-            return (false, Guid.Empty, "Registration timeout");
+            return (false, Guid.Empty, Guid.Empty, "Registration timeout");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error registering worker");
-            return (false, Guid.Empty, $"Unexpected error: {ex.Message}");
+            return (false, Guid.Empty, Guid.Empty, $"Unexpected error: {ex.Message}");
         }
     }
 

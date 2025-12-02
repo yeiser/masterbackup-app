@@ -21,6 +21,7 @@ public class TenantDbContext : DbContext
     // Tenant-specific business entities
     public DbSet<DatabaseConnection> DatabaseConnections { get; set; }
     public DbSet<BackupSchedule> BackupSchedules { get; set; }
+    public DbSet<BackupHistory> BackupHistories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +29,7 @@ public class TenantDbContext : DbContext
 
         ConfigureDatabaseConnection(modelBuilder);
         ConfigureBackupSchedule(modelBuilder);
+        ConfigureBackupHistory(modelBuilder);
     }
 
     private void ConfigureDatabaseConnection(ModelBuilder modelBuilder)
@@ -123,28 +125,239 @@ public class TenantDbContext : DbContext
             entity.ToTable("BackupSchedules");
             entity.HasKey(e => e.Id);
             
+            // ============================================
+            // IDENTIFICACIÓN Y RELACIONES
+            // ============================================
+            
+            entity.Property(e => e.TenantId)
+                .IsRequired();
+            
             entity.Property(e => e.DatabaseConnectionId)
                 .IsRequired();
-
+            
+            // ============================================
+            // CONFIGURACIÓN DE PROGRAMACIÓN
+            // ============================================
+            
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+            
+            entity.Property(e => e.Description)
+                .HasMaxLength(500);
+            
             entity.Property(e => e.CronExpression)
                 .IsRequired()
                 .HasMaxLength(100);
-
+            
+            entity.Property(e => e.TimeZone)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue("UTC");
+            
+            // ============================================
+            // RETENCIÓN
+            // ============================================
+            
             entity.Property(e => e.RetentionDays)
                 .IsRequired();
-
+            
+            // ============================================
+            // ESTADO Y SEGUIMIENTO
+            // ============================================
+            
             entity.Property(e => e.IsActive)
                 .IsRequired()
                 .HasDefaultValue(true);
-
+            
+            entity.Property(e => e.NextRun)
+                .IsRequired(false);
+            
+            entity.Property(e => e.LastRun)
+                .IsRequired(false);
+            
+            entity.Property(e => e.LastExecutionStatus)
+                .IsRequired(false)
+                .HasConversion<int?>();
+            
+            entity.Property(e => e.LastExecutionError)
+                .HasMaxLength(2000);
+            
+            // ============================================
+            // OPCIONES AVANZADAS
+            // ============================================
+            
+            entity.Property(e => e.MaxRetries)
+                .IsRequired()
+                .HasDefaultValue(3);
+            
+            entity.Property(e => e.TimeoutMinutes)
+                .IsRequired()
+                .HasDefaultValue(30);
+            
+            entity.Property(e => e.Priority)
+                .IsRequired()
+                .HasDefaultValue(5);
+            
+            entity.Property(e => e.NotifyOnCompletion)
+                .IsRequired()
+                .HasDefaultValue(true);
+            
+            entity.Property(e => e.NotifyOnlyOnFailure)
+                .IsRequired()
+                .HasDefaultValue(false);
+            
+            // ============================================
+            // AUDITORÍA
+            // ============================================
+            
             entity.Property(e => e.CreatedAt)
                 .IsRequired()
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            
+            entity.Property(e => e.CreatedBy)
+                .IsRequired();
+            
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired(false);
+            
+            entity.Property(e => e.UpdatedBy)
+                .IsRequired(false);
+            
+            // ============================================
+            // ÍNDICES PARA PERFORMANCE
+            // ============================================
+            
+            // Índice compuesto para queries por tenant y estado
+            entity.HasIndex(e => new { e.TenantId, e.IsActive })
+                .HasDatabaseName("IX_BackupSchedules_TenantId_IsActive");
+            
+            // Índice para búsqueda por conexión
+            entity.HasIndex(e => e.DatabaseConnectionId)
+                .HasDatabaseName("IX_BackupSchedules_DatabaseConnectionId");
+            
+            // Índice para próximas ejecuciones (solo activos)
+            entity.HasIndex(e => e.NextRun)
+                .HasDatabaseName("IX_BackupSchedules_NextRun")
+                .HasFilter("[NextRun] IS NOT NULL AND [IsActive] = 1");
+            
+            // Índice para queries por usuario creador
+            entity.HasIndex(e => e.CreatedBy)
+                .HasDatabaseName("IX_BackupSchedules_CreatedBy");
+            
+            // ============================================
+            // RELACIONES
+            // ============================================
+            
+            // Relación con DatabaseConnection
+            entity.HasOne(e => e.DatabaseConnection)
+                .WithMany(d => d.BackupSchedules)
+                .HasForeignKey(e => e.DatabaseConnectionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            // Nota: BackupExecutions se configurará cuando se cree esa entidad
+        });
+    }
 
-            // Índices
-            entity.HasIndex(e => e.DatabaseConnectionId);
-            entity.HasIndex(e => e.IsActive);
-            entity.HasIndex(e => e.NextRun);
+    private void ConfigureBackupHistory(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BackupHistory>(entity =>
+        {
+            entity.ToTable("BackupHistories");
+            entity.HasKey(e => e.Id);
+            
+            // Properties
+            entity.Property(e => e.JobId)
+                .IsRequired();
+            
+            entity.Property(e => e.DatabaseConnectionId)
+                .IsRequired();
+            
+            entity.Property(e => e.BackupScheduleId)
+                .IsRequired(false); // Null for instant backups
+            
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasConversion<int>();
+            
+            entity.Property(e => e.StartTime)
+                .IsRequired();
+            
+            entity.Property(e => e.EndTime)
+                .IsRequired(false);
+            
+            entity.Property(e => e.Duration)
+                .IsRequired(false);
+            
+            entity.Property(e => e.BlobUrl)
+                .HasMaxLength(2000);
+            
+            entity.Property(e => e.BlobName)
+                .HasMaxLength(500);
+            
+            entity.Property(e => e.BackupSizeBytes)
+                .IsRequired(false);
+            
+            entity.Property(e => e.ErrorMessage)
+                .HasMaxLength(2000);
+            
+            entity.Property(e => e.ErrorCode)
+                .HasMaxLength(100);
+            
+            entity.Property(e => e.StackTrace)
+                .HasMaxLength(4000);
+            
+            entity.Property(e => e.RetryCount)
+                .IsRequired()
+                .HasDefaultValue(0);
+            
+            entity.Property(e => e.CompressionType)
+                .HasMaxLength(50);
+            
+            entity.Property(e => e.Metadata)
+                .HasColumnType("jsonb");
+            
+            entity.Property(e => e.IsInstantBackup)
+                .IsRequired()
+                .HasDefaultValue(false);
+            
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            
+            entity.Property(e => e.UpdatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            
+            // Relationships
+            entity.HasOne(e => e.BackupSchedule)
+                .WithMany()
+                .HasForeignKey(e => e.BackupScheduleId)
+                .OnDelete(DeleteBehavior.SetNull);
+            
+            entity.HasOne(e => e.DatabaseConnection)
+                .WithMany()
+                .HasForeignKey(e => e.DatabaseConnectionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            // Indexes
+            entity.HasIndex(e => e.JobId)
+                .HasDatabaseName("IX_BackupHistories_JobId");
+            
+            entity.HasIndex(e => e.BackupScheduleId)
+                .HasDatabaseName("IX_BackupHistories_BackupScheduleId");
+            
+            entity.HasIndex(e => e.DatabaseConnectionId)
+                .HasDatabaseName("IX_BackupHistories_DatabaseConnectionId");
+            
+            entity.HasIndex(e => new { e.Status, e.StartTime })
+                .HasDatabaseName("IX_BackupHistories_Status_StartTime");
+            
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("IX_BackupHistories_CreatedAt");
+            
+            entity.HasIndex(e => e.IsInstantBackup)
+                .HasDatabaseName("IX_BackupHistories_IsInstantBackup");
         });
     }
 }

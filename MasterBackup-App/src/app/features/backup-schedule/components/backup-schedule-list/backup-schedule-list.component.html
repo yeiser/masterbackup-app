@@ -1,0 +1,696 @@
+<!-- Content -->
+<div id="kt_content_container" class="container-xxl">
+  <!-- Alert -->
+  <div *ngIf="showAlert" class="alert alert-{{alertType}} alert-dismissible fade show" role="alert">
+    <div class="d-flex align-items-center">
+      <i class="fa fa-check-circle me-3 fs-2 text-success" *ngIf="alertType === 'success'"></i>
+      <i class="fa fa-exclamation-circle me-3 fs-2 text-danger" *ngIf="alertType === 'danger'"></i>
+      <i class="fa fa-info-circle me-3 fs-2 text-primary" *ngIf="alertType === 'info'"></i>
+      <div>{{ alertMessage }}</div>
+    </div>
+    <button type="button" class="btn-close" (click)="showAlert = false"></button>
+  </div>
+
+  <!-- Card -->
+  <div class="card">
+    <!-- Card header -->
+    <div class="card-header border-0 pt-6 pb-6">
+      <!-- Card toolbar -->
+      <div class="card-toolbar w-100">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 w-100">
+          <!-- Filtros -->
+          <div class="d-flex flex-wrap gap-2">
+            <!-- Search -->
+            <div class="d-flex align-items-center position-relative">
+              <i class="fa fa-search position-absolute ms-4 text-gray-500"></i>
+              <input
+                type="text"
+                [(ngModel)]="searchTerm"
+                (ngModelChange)="onSearchChange()"
+                class="form-control form-control-sm ps-12"
+                placeholder="Buscar disparadores..."
+                style="min-width: 200px;"
+              />
+            </div>
+
+            <!-- Filtro por estado -->
+            <select
+              class="form-select form-select-sm"
+              (change)="onFilterActiveChange($any($event.target).value)"
+              style="width: auto;"
+            >
+              <option value="">Todos los estados</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+
+            <!-- Filtro por base de datos -->
+            <select
+              class="form-select form-select-sm"
+              (change)="onFilterDatabaseChange($any($event.target).value)"
+              style="width: auto;"
+            >
+              <option value="">Todas las bases de datos</option>
+              <option *ngFor="let conn of databaseConnections" [value]="conn.id">
+                {{ conn.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Botones -->
+          <div class="d-flex gap-2">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              (click)="openCreateModal()"
+            >
+              <i class="fa fa-plus"></i>
+              Nuevo disparador
+            </button>
+            <button
+              type="button"
+              class="btn btn-light-primary btn-sm"
+              (click)="refresh()"
+              [disabled]="isLoading"
+            >
+              <i class="fa fa-sync" [class.fa-spin]="isLoading"></i>
+              Actualizar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card body -->
+    <div class="card-body pt-0">
+      <!-- Loading -->
+      <div *ngIf="isLoading && filteredSchedules.length === 0" class="text-center py-10">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+
+      <!-- No schedules -->
+      <div *ngIf="!isLoading && filteredSchedules.length === 0" class="text-center py-10">
+        <img src="assets/media/icons/duotune/general/gen002.svg" height="150" alt="No schedules"/>
+        <h3 class="text-gray-600 mt-5">No hay disparadores de backup disponibles</h3>
+        <p class="text-gray-500">Crea un nuevo disparador para comenzar con los backups automáticos</p>
+      </div>
+
+      <!-- Schedules cards -->
+      <div *ngFor="let schedule of filteredSchedules" class="card mb-5 mb-xl-10 border-2 shadow-sm">
+        <div class="card-body pt-9 pb-0">
+          <!--begin::Details-->
+          <div class="d-flex flex-wrap flex-sm-nowrap mb-3">
+            <!--begin: Pic-->
+            <div class="me-7 mb-4">
+              <div class="symbol symbol-50px symbol-lg-50px symbol-fixed position-relative">
+                <div class="symbol-label bg-primary">
+                  <i class="fa fa-clock fa-3x text-white"></i>
+                </div>
+                <div
+                  class="position-absolute translate-middle bottom-0 start-100 mb-6 rounded-circle border border-4 border-white h-20px w-20px"
+                  [ngClass]="schedule.isActive ? 'bg-success' : 'bg-danger'"
+                ></div>
+              </div>
+            </div>
+            <!--end::Pic-->
+
+            <!--begin::Info-->
+            <div class="flex-grow-1">
+              <!--begin::Title-->
+              <div class="d-flex justify-content-between align-items-start flex-wrap mb-2">
+                <!--begin::User-->
+                <div class="d-flex flex-column">
+                  <!--begin::Name-->
+                  <div class="d-flex align-items-center mb-2">
+                    <span class="text-gray-900 fs-2 fw-bolder me-3">{{ schedule.name }}</span>
+                    
+                    <!-- Badge de estado activo/inactivo -->
+                    <span class="badge me-2" [ngClass]="schedule.isActive ? 'badge-light-success' : 'badge-light'">
+                      {{ schedule.isActive ? 'Activo' : 'Inactivo' }}
+                    </span>
+                  </div>
+                  <!--end::Name-->
+
+                  <!--begin::Info-->
+                  <div class="d-flex flex-wrap fw-bold fs-6 mb-4 pe-2">
+                    <span class="d-flex align-items-center text-gray-700 me-8">
+                      <i class="fa fa-database me-2"></i>
+                      {{ schedule.databaseConnectionName }}
+                    </span>
+                  </div>
+                  <!--end::Info-->
+
+                  <!--begin::Info-->
+                  <div class="d-flex flex-wrap fw-bold fs-6 mb-4 pe-2">
+                    <span class="d-flex align-items-center text-gray-700 me-8">
+                      <i class="fa fa-calendar me-2"></i>
+                      {{ getScheduleDescription(schedule) }}
+                    </span>
+                    <span class="d-flex align-items-center text-gray-700 me-8">
+                      <i class="fa fa-history me-2"></i>
+                      Retención: {{ schedule.retentionDays }} días
+                    </span>
+                  </div>
+                  <!--end::Info-->
+
+                  <!--begin::Description-->
+                  <div *ngIf="schedule.description" class="d-flex flex-wrap fw-bold fs-7 mb-4 pe-2">
+                    <span class="d-flex align-items-center text-gray-400">
+                      <i class="fa fa-info-circle me-2"></i>
+                      {{ schedule.description }}
+                    </span>
+                  </div>
+                  <!--end::Description-->
+
+                  <!--begin::Stats-->
+                  <div class="d-flex flex-wrap fw-bold fs-7 mb-4 pe-2">
+                    <!-- Próxima ejecución -->
+                    <span *ngIf="schedule.nextRunTime" class="d-flex align-items-center text-gray-500 me-5">
+                      <i class="fa fa-clock me-2"></i>
+                      Próxima ejecución: <span class="text-primary ms-1">{{ schedule.nextRunTime | relativeTime }}</span>
+                    </span>
+
+                    <!-- Última ejecución -->
+                    <span *ngIf="schedule.lastRunTime" class="d-flex align-items-center text-gray-500 me-5">
+                      <i class="fa fa-history me-2"></i>
+                      Última ejecución: {{ schedule.lastRunTime | relativeTime }}
+                    </span>
+
+                    <!-- Estado del último backup -->
+                    <span *ngIf="schedule.lastBackupStatus" class="d-flex align-items-center me-5">
+                      <span class="badge badge-{{ BackupStatusColors[schedule.lastBackupStatus] }}">
+                        {{ BackupStatusLabels[schedule.lastBackupStatus] }}
+                      </span>
+                    </span>
+                  </div>
+                  <!--end::Stats-->
+
+                  <!--begin::Dates-->
+                  <div class="d-flex flex-wrap fw-bold fs-7 mb-4 pe-2 text-gray-400">
+                    <span class="me-5">
+                      <i class="fa fa-calendar-plus me-1"></i>
+                      Creado: {{ schedule.createdAt | relativeTime }}
+                    </span>
+                    <span *ngIf="schedule.updatedAt">
+                      <i class="fa fa-calendar-edit me-1"></i>
+                      Actualizado: {{ schedule.updatedAt | relativeTime }}
+                    </span>
+                  </div>
+                  <!--end::Dates-->
+                </div>
+                <!--end::User-->
+
+                <!--begin::Actions-->
+                <div class="d-flex my-4">
+                  <!--begin::Menu-->
+                  <div class="me-0">
+                    <button
+                      class="btn btn-sm btn-icon btn-bg-light btn-active-color-primary"
+                      data-kt-menu-trigger="click"
+                      data-kt-menu-placement="bottom-end"
+                    >
+                      <i class="fa fa-ellipsis-v fs-5"></i>
+                    </button>
+
+                    <!--begin::Menu 3-->
+                    <div
+                      class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-800 menu-state-bg-light-primary fw-bold w-200px py-3"
+                      data-kt-menu="true"
+                    >
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3">
+                        <a class="menu-link px-3" (click)="executeNow(schedule)">
+                          <i class="fa fa-play text-primary me-2"></i>
+                          Ejecutar ahora
+                        </a>
+                      </div>
+                      <!--end::Menu item-->
+
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3" *ngIf="schedule.isActive">
+                        <a class="menu-link px-3" (click)="pauseSchedule(schedule)">
+                          <i class="fa fa-pause text-warning me-2"></i>
+                          Pausar
+                        </a>
+                      </div>
+                      <!--end::Menu item-->
+
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3" *ngIf="!schedule.isActive">
+                        <a class="menu-link px-3" (click)="resumeSchedule(schedule)">
+                          <i class="fa fa-play-circle text-success me-2"></i>
+                          Reanudar
+                        </a>
+                      </div>
+                      <!--end::Menu item-->
+
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3">
+                        <a class="menu-link px-3" (click)="openEditModal(schedule)">
+                          <i class="fa fa-edit text-info me-2"></i>
+                          Editar
+                        </a>
+                      </div>
+                      <!--end::Menu item-->
+
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3">
+                        <div class="menu-content px-3 py-3">
+                          <div class="separator border-gray-200"></div>
+                        </div>
+                      </div>
+                      <!--end::Menu item-->
+
+                      <!--begin::Menu item-->
+                      <div class="menu-item px-3">
+                        <a class="menu-link px-3 text-danger" (click)="confirmDelete(schedule)">
+                          <i class="fa fa-trash me-2"></i>
+                          Eliminar
+                        </a>
+                      </div>
+                      <!--end::Menu item-->
+                    </div>
+                    <!--end::Menu 3-->
+                  </div>
+                  <!--end::Menu-->
+                </div>
+                <!--end::Actions-->
+              </div>
+              <!--end::Title-->
+            </div>
+            <!--end::Info-->
+          </div>
+          <!--end::Details-->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para crear/editar schedule -->
+<div class="modal fade" id="kt_modal_schedule_form" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered mw-650px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="fw-bolder">{{ isEditMode ? 'Editar disparador' : 'Nuevo disparador' }}</h2>
+        <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+          <i class="fa fa-times fs-1"></i>
+        </div>
+      </div>
+
+      <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+        <form [formGroup]="scheduleForm" id="kt_modal_schedule_form_form">
+          <!-- Alert dentro del modal -->
+          <div *ngIf="showAlert" class="alert alert-{{alertType}} alert-dismissible fade show mb-5" role="alert">
+            {{ alertMessage }}
+            <button type="button" class="btn-close" (click)="showAlert = false"></button>
+          </div>
+
+          <!-- Nombre -->
+          <div class="fv-row mb-7">
+            <label class="required fw-bold fs-6 mb-2">Nombre</label>
+            <input
+              type="text"
+              formControlName="name"
+              class="form-control form-control-solid"
+              placeholder="Ej: Backup diario producción"
+            />
+            <div *ngIf="scheduleForm.get('name')?.invalid && scheduleForm.get('name')?.touched" class="text-danger mt-2">
+              El nombre es requerido
+            </div>
+          </div>
+
+          <!-- Descripción -->
+          <div class="fv-row mb-7">
+            <label class="fw-bold fs-6 mb-2">Descripción</label>
+            <textarea
+              formControlName="description"
+              class="form-control form-control-solid"
+              rows="3"
+              placeholder="Descripción opcional del disparador"
+            ></textarea>
+          </div>
+
+          <!-- Conexión de base de datos -->
+          <div class="fv-row mb-7" *ngIf="!isEditMode">
+            <label class="required fw-bold fs-6 mb-2">Base de Datos</label>
+            <select formControlName="databaseConnectionId" class="form-select form-select-solid">
+              <option value="">Selecciona una base de datos</option>
+              <option *ngFor="let conn of databaseConnections" [value]="conn.id">
+                {{ conn.name }} ({{ getDatabaseTypeLabel(conn.type) }})
+              </option>
+            </select>
+            <div *ngIf="scheduleForm.get('databaseConnectionId')?.invalid && scheduleForm.get('databaseConnectionId')?.touched" class="text-danger mt-2">
+              Debes seleccionar una base de datos
+            </div>
+          </div>
+
+          <!-- Configuración de Horario -->
+          <div class="fv-row mb-7">
+            <label class="required fw-bold fs-6 mb-2">
+              Programación (Cron)
+            </label>
+            
+            <div class="card card-bordered">
+              <div class="card-body p-6">
+                
+                <!-- Frecuencia -->
+                <div class="mb-5">
+                  <label class="form-label fw-semibold mb-3">Frecuencia:</label>
+                  <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="cronFrequency" id="freq_daily" 
+                           [checked]="cronConfig.frequency === 'daily'" (change)="setCronFrequency('daily')">
+                    <label class="btn btn-outline btn-outline-dashed btn-active-light-primary" for="freq_daily">
+                      <i class="fa fa-calendar-day d-block mt-1 mb-2"></i>
+                      <span class="d-block fs-7">Diario</span>
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cronFrequency" id="freq_weekly" 
+                           [checked]="cronConfig.frequency === 'weekly'" (change)="setCronFrequency('weekly')">
+                    <label class="btn btn-outline btn-outline-dashed btn-active-light-primary" for="freq_weekly">
+                      <i class="fa fa-calendar-week d-block mt-1 mb-2"></i>
+                      <span class="d-block fs-7">Semanal</span>
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cronFrequency" id="freq_monthly" 
+                           [checked]="cronConfig.frequency === 'monthly'" (change)="setCronFrequency('monthly')">
+                    <label class="btn btn-outline btn-outline-dashed btn-active-light-primary" for="freq_monthly">
+                      <i class="fa fa-calendar d-block mt-1 mb-2"></i>
+                      <span class="d-block fs-7">Mensual</span>
+                    </label>
+
+                    <input type="radio" class="btn-check" name="cronFrequency" id="freq_custom" 
+                           [checked]="cronConfig.frequency === 'custom'" (change)="setCronFrequency('custom')">
+                    <label class="btn btn-outline btn-outline-dashed btn-active-light-primary" for="freq_custom">
+                      <i class="fa fa-cog d-block mt-1 mb-2"></i>
+                      <span class="d-block fs-7">Custom</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Configuración Diaria -->
+                <div *ngIf="cronConfig.frequency === 'daily'" class="mb-5">
+                  <label class="form-label fw-semibold mb-3">Hora de ejecución:</label>
+                  <div class="row g-3">
+                    <div class="col-6">
+                      <label class="form-label text-muted">Hora</label>
+                      <select class="form-select form-select-solid" [(ngModel)]="cronConfig.hour" 
+                              [ngModelOptions]="{standalone: true}" (change)="updateCronExpression()">
+                        <option *ngFor="let h of hours" [value]="h">{{ h.toString().padStart(2, '0') }}</option>
+                      </select>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label text-muted">Minuto</label>
+                      <select class="form-select form-select-solid" [(ngModel)]="cronConfig.minute" 
+                              [ngModelOptions]="{standalone: true}" (change)="updateCronExpression()">
+                        <option *ngFor="let m of minutes" [value]="m">{{ m.toString().padStart(2, '0') }}</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Configuración Semanal -->
+                <div *ngIf="cronConfig.frequency === 'weekly'">
+                  <div class="mb-4">
+                    <label class="form-label fw-semibold mb-3">Días de la semana:</label>
+                    <div class="d-flex flex-wrap gap-2">
+                      <div *ngFor="let day of weekDays" class="form-check form-check-custom form-check-solid form-check-sm">
+                        <input class="form-check-input" type="checkbox" [id]="'day_' + day.value" 
+                               [(ngModel)]="day.selected" [ngModelOptions]="{standalone: true}"
+                               (change)="updateCronExpression()">
+                        <label class="form-check-label fw-bold" [for]="'day_' + day.value">
+                          {{ day.label }}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-6">
+                      <label class="form-label text-muted">Hora</label>
+                      <select class="form-select form-select-solid" [(ngModel)]="cronConfig.hour" 
+                              [ngModelOptions]="{standalone: true}" (change)="updateCronExpression()">
+                        <option *ngFor="let h of hours" [value]="h">{{ h.toString().padStart(2, '0') }}</option>
+                      </select>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label text-muted">Minuto</label>
+                      <select class="form-select form-select-solid" [(ngModel)]="cronConfig.minute" 
+                              [ngModelOptions]="{standalone: true}" (change)="updateCronExpression()">
+                        <option *ngFor="let m of minutes" [value]="m">{{ m.toString().padStart(2, '0') }}</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Configuración Mensual -->
+                <div *ngIf="cronConfig.frequency === 'monthly'">
+                  <div class="mb-4">
+                    <label class="form-label fw-semibold mb-3">Día del mes:</label>
+                    <select class="form-select form-select-solid" [(ngModel)]="cronConfig.dayOfMonth" 
+                            [ngModelOptions]="{standalone: true}" (change)="updateCronExpression()">
+                      <option *ngFor="let d of monthDays" [value]="d">{{ d }}</option>
+                    </select>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-6">
+                      <label class="form-label text-muted">Hora</label>
+                      <select class="form-select form-select-solid" [(ngModel)]="cronConfig.hour" 
+                              [ngModelOptions]="{standalone: true}" (change)="updateCronExpression()">
+                        <option *ngFor="let h of hours" [value]="h">{{ h.toString().padStart(2, '0') }}</option>
+                      </select>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label text-muted">Minuto</label>
+                      <select class="form-select form-select-solid" [(ngModel)]="cronConfig.minute" 
+                              [ngModelOptions]="{standalone: true}" (change)="updateCronExpression()">
+                        <option *ngFor="let m of minutes" [value]="m">{{ m.toString().padStart(2, '0') }}</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Configuración Personalizada -->
+                <div *ngIf="cronConfig.frequency === 'custom'">
+                  <label class="form-label fw-semibold mb-2">Expresión Cron (Quartz.NET):</label>
+                  <input
+                    type="text"
+                    class="form-control form-control-solid"
+                    [(ngModel)]="cronConfig.customExpression"
+                    [ngModelOptions]="{standalone: true}"
+                    (ngModelChange)="onCustomCronChange($event)"
+                    placeholder="Ej: 0 0 */6 * * ? (cada 6 horas)"
+                  />
+                  <div class="form-text mt-2">
+                    <i class="fa fa-info-circle me-1"></i>
+                    Formato Quartz.NET: <code>segundo minuto hora día mes díaSemana</code>
+                    <br>
+                    <small class="text-muted">
+                      Ejemplos: 
+                      <code>0 0 2 * * ?</code> (diario 2 AM) | 
+                      <code>0 30 14 * * ?</code> (diario 2:30 PM) | 
+                      <code>0 0 */6 * * ?</code> (cada 6 horas)
+                    </small>
+                  </div>
+                </div>
+
+                <!-- Vista previa -->
+                <div class="mt-5 pt-4 border-top border-gray-300">
+                  <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                      <span class="text-muted fw-semibold me-2">Expresión generada:</span>
+                      <code class="fs-7 text-dark">{{ scheduleForm.get('cronExpression')?.value || 'N/A' }}</code><br>
+                      <span class="badge badge-light-info mt-2">
+                        <i class="fa fa-clock text-info me-1"></i>
+                        {{ getCronDescription(scheduleForm.get('cronExpression')?.value) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div *ngIf="scheduleForm.get('cronExpression')?.invalid && (scheduleForm.get('cronExpression')?.touched || scheduleForm.get('cronExpression')?.dirty)" class="alert alert-danger d-flex align-items-center mt-3 py-2">
+              <i class="fa fa-exclamation-circle me-2"></i>
+              <span *ngIf="scheduleForm.get('cronExpression')?.errors?.['required']">
+                La expresión cron es requerida
+              </span>
+              <span *ngIf="scheduleForm.get('cronExpression')?.errors?.['invalidCron']">
+                {{ scheduleForm.get('cronExpression')?.errors?.['invalidCron'] }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Retención y Zona Horaria -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="fv-row mb-7">
+                <label class="required fw-bold fs-6 mb-2">Retención (días)</label>
+                <input
+                  type="number"
+                  formControlName="retentionDays"
+                  class="form-control form-control-solid"
+                  placeholder="Ej: 30"
+                  min="1"
+                  max="365"
+                />
+                <div class="form-text">Días que se mantendrán los backups</div>
+                <div *ngIf="scheduleForm.get('retentionDays')?.invalid && scheduleForm.get('retentionDays')?.touched" class="text-danger mt-2">
+                  Entre 1 y 365 días
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="fv-row mb-7">
+                <label class="fw-bold fs-6 mb-2">Zona Horaria</label>
+                <select formControlName="timeZone" class="form-select form-select-solid">
+                  <option value="America/Bogota">America/Bogota (UTC-5)</option>
+                </select>
+                <div class="form-text">Zona horaria de ejecución</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reintentos y Timeout -->
+          <div class="row">
+            <div class="col-md-4">
+              <div class="fv-row mb-7">
+                <label class="required fw-bold fs-6 mb-2">Reintentos Máximos</label>
+                <input
+                  type="number"
+                  formControlName="maxRetries"
+                  class="form-control form-control-solid"
+                  placeholder="3"
+                  min="0"
+                  max="10"
+                />
+                <div class="form-text">0-10</div>
+                <div *ngIf="scheduleForm.get('maxRetries')?.invalid && scheduleForm.get('maxRetries')?.touched" class="text-danger mt-2">
+                  Debe estar entre 0 y 10
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="fv-row mb-7">
+                <label class="required fw-bold fs-6 mb-2">Timeout (minutos)</label>
+                <input
+                  type="number"
+                  formControlName="timeoutMinutes"
+                  class="form-control form-control-solid"
+                  placeholder="30"
+                  min="1"
+                  max="1440"
+                />
+                <div class="form-text">1-1440 min</div>
+                <div *ngIf="scheduleForm.get('timeoutMinutes')?.invalid && scheduleForm.get('timeoutMinutes')?.touched" class="text-danger mt-2">
+                  Debe estar entre 1 y 1440
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="fv-row mb-7">
+                <label class="required fw-bold fs-6 mb-2">Prioridad</label>
+                <input
+                  type="number"
+                  formControlName="priority"
+                  class="form-control form-control-solid"
+                  placeholder="5"
+                  min="1"
+                  max="10"
+                />
+                <div class="form-text">1 (baja) - 10 (alta)</div>
+                <div *ngIf="scheduleForm.get('priority')?.invalid && scheduleForm.get('priority')?.touched" class="text-danger mt-2">
+                  Debe estar entre 1 y 10
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notificaciones -->
+          <div class="fv-row mb-7">
+            <label class="fw-bold fs-6 mb-3">
+              Notificaciones
+            </label>
+            <div class="d-flex flex-column gap-3">
+              <div class="form-check form-check-custom form-check-solid">
+                <input
+                  class="form-check-input"
+                  type="radio"
+                  formControlName="notificationMode"
+                  value="all"
+                  id="notify_all"
+                />
+                <label class="form-check-label" for="notify_all">
+                  <span class="fw-bold">Notificar siempre</span>
+                  <span class="text-muted d-block fs-7">Al completar con éxito o fallo</span>
+                </label>
+              </div>
+              <div class="form-check form-check-custom form-check-solid">
+                <input
+                  class="form-check-input"
+                  type="radio"
+                  formControlName="notificationMode"
+                  value="failure"
+                  id="notify_failure"
+                />
+                <label class="form-check-label" for="notify_failure">
+                  <span class="fw-bold">Notificar solo fallos</span>
+                  <span class="text-muted d-block fs-7">Solo cuando el backup falle</span>
+                </label>
+              </div>
+              <div class="form-check form-check-custom form-check-solid">
+                <input
+                  class="form-check-input"
+                  type="radio"
+                  formControlName="notificationMode"
+                  value="none"
+                  id="notify_none"
+                />
+                <label class="form-check-label" for="notify_none">
+                  <span class="fw-bold">No notificar</span>
+                  <span class="text-muted d-block fs-7">Sin notificaciones automáticas</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="separator separator-dashed my-7"></div>
+
+          <!-- Estado activo -->
+          <div class="fv-row mb-7">
+            <div class="form-check form-switch form-check-custom form-check-solid">
+              <input
+                class="form-check-input h-20px w-30px"
+                type="checkbox"
+                formControlName="isActive"
+                id="schedule_isActive"
+              />
+              <label class="form-check-label fw-bold" for="schedule_isActive">
+                Activar
+              </label>
+            </div>
+            <div class="form-text">Los disparadores activos se ejecutarán automáticamente según la programación</div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="saveSchedule()"
+          [disabled]="scheduleForm.invalid || isLoading"
+        >
+          <span *ngIf="!isLoading">{{ isEditMode ? 'Actualizar' : 'Crear' }}</span>
+          <span *ngIf="isLoading">
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            Guardando...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

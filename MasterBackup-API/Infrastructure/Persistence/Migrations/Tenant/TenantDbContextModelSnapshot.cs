@@ -22,6 +22,106 @@ namespace MasterBackup_API.Infrastructure.Persistence.Migrations.Tenant
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("MasterBackup_API.Domain.Entities.BackupHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BackupScheduleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("BackupSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("BlobName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("BlobUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CompressionType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("DatabaseConnectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<TimeSpan?>("Duration")
+                        .HasColumnType("interval");
+
+                    b.Property<DateTime?>("EndTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsInstantBackup")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("StackTrace")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BackupScheduleId")
+                        .HasDatabaseName("IX_BackupHistories_BackupScheduleId");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_BackupHistories_CreatedAt");
+
+                    b.HasIndex("DatabaseConnectionId")
+                        .HasDatabaseName("IX_BackupHistories_DatabaseConnectionId");
+
+                    b.HasIndex("IsInstantBackup")
+                        .HasDatabaseName("IX_BackupHistories_IsInstantBackup");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("IX_BackupHistories_JobId");
+
+                    b.HasIndex("Status", "StartTime")
+                        .HasDatabaseName("IX_BackupHistories_Status_StartTime");
+
+                    b.ToTable("BackupHistories", (string)null);
+                });
+
             modelBuilder.Entity("MasterBackup_API.Domain.Entities.BackupSchedule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -33,6 +133,9 @@ namespace MasterBackup_API.Infrastructure.Persistence.Migrations.Tenant
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("CronExpression")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -41,27 +144,91 @@ namespace MasterBackup_API.Infrastructure.Persistence.Migrations.Tenant
                     b.Property<Guid>("DatabaseConnectionId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<string>("LastExecutionError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("LastExecutionStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LastRun")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaxRetries")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime?>("NextRun")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("NotifyOnCompletion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("NotifyOnlyOnFailure")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("Priority")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(5);
 
                     b.Property<int>("RetentionDays")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("UTC");
+
+                    b.Property<int>("TimeoutMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(30);
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("DatabaseConnectionId");
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("IX_BackupSchedules_CreatedBy");
 
-                    b.HasIndex("IsActive");
+                    b.HasIndex("DatabaseConnectionId")
+                        .HasDatabaseName("IX_BackupSchedules_DatabaseConnectionId");
 
-                    b.HasIndex("NextRun");
+                    b.HasIndex("NextRun")
+                        .HasDatabaseName("IX_BackupSchedules_NextRun")
+                        .HasFilter("[NextRun] IS NOT NULL AND [IsActive] = 1");
+
+                    b.HasIndex("TenantId", "IsActive")
+                        .HasDatabaseName("IX_BackupSchedules_TenantId_IsActive");
 
                     b.ToTable("BackupSchedules", (string)null);
                 });
@@ -164,6 +331,24 @@ namespace MasterBackup_API.Infrastructure.Persistence.Migrations.Tenant
                     b.HasIndex("Type");
 
                     b.ToTable("DatabaseConnections", (string)null);
+                });
+
+            modelBuilder.Entity("MasterBackup_API.Domain.Entities.BackupHistory", b =>
+                {
+                    b.HasOne("MasterBackup_API.Domain.Entities.BackupSchedule", "BackupSchedule")
+                        .WithMany()
+                        .HasForeignKey("BackupScheduleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("MasterBackup_API.Domain.Entities.DatabaseConnection", "DatabaseConnection")
+                        .WithMany()
+                        .HasForeignKey("DatabaseConnectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BackupSchedule");
+
+                    b.Navigation("DatabaseConnection");
                 });
 
             modelBuilder.Entity("MasterBackup_API.Domain.Entities.BackupSchedule", b =>

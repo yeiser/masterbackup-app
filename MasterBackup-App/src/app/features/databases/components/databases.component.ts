@@ -14,7 +14,7 @@ import {
   DatabaseTypeIcons,
   WorkerAssignmentMode,
   WorkerAssignmentModeLabels
-} from '../../../core/models/database-connection.models';
+} from '../models/database-connection.models';
 import { RelativeTimePipe } from '../../../core/pipes/relative-time.pipe';
 
 declare var bootstrap: any;
@@ -139,7 +139,7 @@ export class DatabasesComponent implements OnInit, OnDestroy {
 
     // Limpiar assignedWorkerId cuando se cambie a modo automático
     this.connectionForm.get('assignmentMode')?.valueChanges.subscribe(mode => {
-      if (Number(mode) !== 2) { // Si no es modo Dedicado
+      if (Number(mode) !== WorkerAssignmentMode.Dedicated) { // Si no es modo Dedicado
         this.connectionForm.patchValue({ assignedWorkerId: null });
       }
     });
@@ -251,10 +251,57 @@ export class DatabasesComponent implements OnInit, OnDestroy {
     this.isEditMode = true;
     this.editingId = connection.id;
     this.showAlert = false; // Limpiar alertas anteriores
+    
+    // Debug: Ver qué está llegando del backend
+    console.log('Connection data:', connection);
+    console.log('assignmentMode:', connection.assignmentMode, 'type:', typeof connection.assignmentMode);
+    console.log('assignedWorkerId:', connection.assignedWorkerId, 'type:', typeof connection.assignedWorkerId);
+    console.log('tags:', connection.tags, 'type:', typeof connection.tags);
+    
+    // Parsear tags - ya viene como array desde el backend
+    let parsedTags: string[] = [];
+    if (connection.tags) {
+      if (Array.isArray(connection.tags)) {
+        parsedTags = connection.tags;
+      } else if (typeof connection.tags === 'string') {
+        try {
+          parsedTags = JSON.parse(connection.tags);
+        } catch {
+          parsedTags = [];
+        }
+      }
+    }
+    
+    // Convertir assignmentMode desde string a número del enum
+    // El backend envía "Auto" o "Dedicated" como string
+    let assignmentMode = WorkerAssignmentMode.Auto;
+    if (connection.assignmentMode) {
+      const modeStr = connection.assignmentMode.toString().toLowerCase();
+      if (modeStr === 'dedicated') {
+        assignmentMode = WorkerAssignmentMode.Dedicated;
+      } else if (modeStr === 'auto' || modeStr === 'automatic') {
+        assignmentMode = WorkerAssignmentMode.Auto;
+      } else {
+        // Si es un número, usarlo directamente
+        const modeNum = Number(connection.assignmentMode);
+        if (!isNaN(modeNum)) {
+          assignmentMode = modeNum;
+        }
+      }
+    }
+    
+    console.log('Parsed assignmentMode:', assignmentMode);
+    console.log('Parsed tags:', parsedTags);
+    
+    // Convertir type de string a número si es necesario
+    const databaseType = typeof connection.type === 'string' 
+      ? Number(connection.type) 
+      : connection.type;
+    
     this.connectionForm.patchValue({
       name: connection.name,
       description: connection.description,
-      type: connection.type,
+      type: databaseType,
       host: connection.host,
       port: connection.port,
       database: connection.database,
@@ -262,10 +309,13 @@ export class DatabasesComponent implements OnInit, OnDestroy {
       password: '',
       sslMode: connection.sslMode,
       isActive: connection.isActive,
-      assignmentMode: connection.assignmentMode || WorkerAssignmentMode.Auto,
+      assignmentMode: assignmentMode,
       assignedWorkerId: connection.assignedWorkerId || null,
-      tags: connection.tags || []
+      tags: parsedTags
     });
+    
+    console.log('Form values after patch:', this.connectionForm.value);
+    
     // Password es opcional en edición
     this.connectionForm.get('password')?.clearValidators();
     this.connectionForm.get('password')?.updateValueAndValidity();
@@ -284,7 +334,7 @@ export class DatabasesComponent implements OnInit, OnDestroy {
     const formValue = this.connectionForm.value;
 
     // Validar que si el modo es Dedicado, se haya seleccionado un worker
-    if (Number(formValue.assignmentMode) === 2 && !formValue.assignedWorkerId) {
+    if (Number(formValue.assignmentMode) === WorkerAssignmentMode.Dedicated && !formValue.assignedWorkerId) {
       this.showErrorAlert('Debes seleccionar un worker cuando el modo de asignación es Dedicado');
       return;
     }
@@ -368,7 +418,7 @@ export class DatabasesComponent implements OnInit, OnDestroy {
     this.databaseService.testConnection(connectionId).subscribe({
       next: () => {
         console.info(`Probando conexión "${connection.name}"... El resultado llegará en breve.`);
-        this.showInfoAlert(`⏳ Probando conexión "${connection.name}"... El resultado llegará en breve.`);
+        this.showInfoAlert(`Probando conexión "${connection.name}"... El resultado llegará en breve.`);
         
         // Iniciar polling para actualizar el estado automáticamente
         this.startPolling();
@@ -384,7 +434,7 @@ export class DatabasesComponent implements OnInit, OnDestroy {
       error: (error) => {
         console.error('Error enviando solicitud de prueba:', error);
         this.testingConnectionId = undefined;
-        this.showErrorAlert('❌ Error al enviar solicitud de prueba: ' + (error.error?.message || 'Error desconocido'));
+        this.showErrorAlert('Error al enviar solicitud de prueba: ' + (error.error?.message || 'Error desconocido'));
       }
     });
   }
@@ -400,7 +450,7 @@ export class DatabasesComponent implements OnInit, OnDestroy {
    * Cargar conexiones silenciosamente (sin mostrar loader)
    */
   private loadConnectionsSilently(): void {
-    this.databaseService.getAllConnections().subscribe({
+    this.databaseService.getAllConnections(true).subscribe({
       next: (data) => {
         const previousTestingId = this.testingConnectionId;
         
@@ -422,9 +472,9 @@ export class DatabasesComponent implements OnInit, OnDestroy {
               this.stopPolling();
               
               if (testedConnection.lastTestSuccessful) {
-                this.showSuccessAlert(`✓ Conexión "${testedConnection.name}" exitosa: ${testedConnection.lastTestStatus}`);
+                this.showSuccessAlert(`Conexión "${testedConnection.name}" exitosa: ${testedConnection.lastTestStatus}`);
               } else {
-                this.showErrorAlert(`✗ Conexión "${testedConnection.name}" fallida: ${testedConnection.lastTestStatus}`);
+                this.showErrorAlert(`Conexión "${testedConnection.name}" fallida: ${testedConnection.lastTestStatus}`);
               }
             }
           }
@@ -495,17 +545,25 @@ export class DatabasesComponent implements OnInit, OnDestroy {
    * Alternar estado activo/inactivo
    */
   toggleActive(connection: DatabaseConnectionDto): void {
+    // Convertir type y assignmentMode a números
+    const databaseType = typeof connection.type === 'string' 
+      ? Number(connection.type) 
+      : connection.type;
+    const assignmentMode = connection.assignmentMode 
+      ? Number(connection.assignmentMode) 
+      : WorkerAssignmentMode.Auto;
+    
     const updateDto: UpdateDatabaseConnectionDto = {
       name: connection.name,
       description: connection.description,
-      type: connection.type,
+      type: databaseType,
       host: connection.host,
       port: connection.port,
       database: connection.database,
       username: connection.username,
       sslMode: connection.sslMode,
       isActive: !connection.isActive,
-      assignmentMode: Number(connection.assignmentMode),
+      assignmentMode: assignmentMode,
       assignedWorkerId: connection.assignedWorkerId,
       tags: connection.tags || []
     };

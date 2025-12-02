@@ -105,7 +105,7 @@ public class TestDatabaseConnectionCommandHandler : IRequestHandler<TestDatabase
         // Desencriptar password para enviar al worker
         var decryptedPassword = _encryptionService.Decrypt(connection.EncryptedPassword);
 
-        // Mensaje para el worker
+        // Crear mensaje para el worker
         var message = new TestConnectionMessage
         {
             ConnectionId = connection.Id,
@@ -123,9 +123,9 @@ public class TestDatabaseConnectionCommandHandler : IRequestHandler<TestDatabase
         };
 
         // Enviar a RabbitMQ
-        await _messageQueueService.PublishTestConnectionJob(tenantId, message);
+        await _messageQueueService.PublishTestConnectionAsync(tenantId, message);
 
-        _logger.LogInformation("Test connection job sent for connection {ConnectionId} to worker (Mode: {Mode})", 
+        _logger.LogInformation("Test connection message published for connection {ConnectionId} to RabbitMQ (Mode: {Mode})", 
             connection.Id, connection.AssignmentMode);
 
         return true;

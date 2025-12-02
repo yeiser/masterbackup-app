@@ -41,13 +41,15 @@ MasterBackup-Worker/
 
 ## ⚙️ Configuración
 
-### appsettings.json
+### ✨ Configuración Simplificada
+
+Solo necesitas configurar el **ApiKey** del tenant. El `WorkerId` y `TenantId` se obtienen **automáticamente** del API durante el registro.
+
+**appsettings.json:**
 
 ```json
 {
   "Worker": {
-    "WorkerId": "guid-del-worker",
-    "TenantId": "guid-del-tenant",
     "WorkerName": "Worker-Production-01",
     "ApiKey": "api-key-del-tenant",
     "Tags": ["production", "postgresql", "americas"],
@@ -59,16 +61,28 @@ MasterBackup-Worker/
     "Port": 5672
   },
   "Api": {
-    "BaseUrl": "http://localhost:7000"
+    "BaseUrl": "https://localhost:7001"
   }
 }
 ```
 
+### Cómo Obtener el ApiKey
+
+**Opción 1 - Query SQL en la base de datos Master:**
+```sql
+SELECT "Id", "Name", "ApiKey" 
+FROM "Tenants" 
+WHERE "IsActive" = true;
+```
+
+**Opción 2 - Desde el frontend (futuro):**
+- Iniciar sesión como Admin
+- Ir a Configuración → API Settings
+- Copiar el ApiKey mostrado
+
 ### Variables de Entorno (Recomendado para Docker)
 
 ```bash
-WORKER__WORKERID=guid-del-worker
-WORKER__TENANTID=guid-del-tenant
 WORKER__WORKERNAME=Worker-Production-01
 WORKER__APIKEY=api-key-del-tenant
 WORKER__TAGS__0=production
@@ -78,7 +92,7 @@ WORKER__SUPPORTEDDATABASETYPES__0=PostgreSQL
 WORKER__MAXCONCURRENTJOBS=3
 RABBITMQ__HOST=rabbitmq
 RABBITMQ__PORT=5672
-API__BASEURL=http://api:8080
+API__BASEURL=https://api:8080
 ```
 
 ## 🔐 Sistema de Autorización de Workers
@@ -254,6 +268,47 @@ info: RabbitMQConsumerService[0]
 
 - Si ningún worker está autorizado, los mensajes se reencolarán continuamente
 - Solución: Asignar un worker dedicado o agregar tags correctos a algún worker
+
+### ⚠️ El Worker no consume mensajes de RabbitMQ:
+
+**Síntoma**: Los mensajes se publican en RabbitMQ pero el worker no los procesa.
+
+**Causa más común**: El `TenantId` en `appsettings.json` es incorrecto o está como `00000000-0000-0000-0000-000000000000`.
+
+**Solución**:
+
+1. Ejecuta el script para obtener el TenantId correcto:
+   ```powershell
+   .\get-tenant-info.ps1
+   ```
+
+2. O ejecuta este query en PostgreSQL:
+   ```sql
+   SELECT "Id" as TenantId, "Name", "ApiKey" 
+   FROM "Tenants" 
+   WHERE "IsActive" = true;
+   ```
+
+3. Actualiza `appsettings.json` con el TenantId y ApiKey correctos:
+   ```json
+   {
+     "Worker": {
+       "TenantId": "COPIA_EL_GUID_REAL_AQUI",
+       "ApiKey": "COPIA_EL_APIKEY_REAL_AQUI",
+       ...
+     }
+   }
+   ```
+
+4. Reinicia el worker. Deberías ver en los logs:
+   ```
+   Queue Name: {tu-tenant-id-real}.test-connection.queue
+   ```
+
+**Cómo verificar**: 
+- En los logs del worker, busca la línea `Queue Name:`
+- El TenantId en el nombre de la queue debe coincidir con el TenantId del usuario que hace el test
+- Si ves `00000000-0000-0000-0000-000000000000`, el TenantId está mal configurado
 
 ## 📚 Referencias
 

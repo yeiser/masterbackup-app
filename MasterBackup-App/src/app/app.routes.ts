@@ -8,6 +8,7 @@ import { DatabasesComponent } from './features/databases/components/databases.co
 import { WorkersComponent } from './features/workers/component/workers/workers.component';
 import { WrapperComponent } from './layout/components/wrapper/wrapper.component';
 import { authGuard } from './core/guards/auth.guard';
+import { BackupScheduleListComponent } from './features/backup-schedule/components/backup-schedule-list/backup-schedule-list.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
@@ -26,7 +27,8 @@ export const routes: Routes = [
     children: [
       { path: 'dashboard', component: DashboardComponent },
       { path: 'databases', component: DatabasesComponent },
-      { path: 'agents', component: WorkersComponent }
+      { path: 'agents', component: WorkersComponent },
+      { path: 'triggers', component: BackupScheduleListComponent },
       // Agregar más rutas aquí
     ]
   }

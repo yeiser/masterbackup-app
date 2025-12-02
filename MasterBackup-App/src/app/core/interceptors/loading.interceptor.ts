@@ -14,6 +14,16 @@ export class LoadingInterceptor implements HttpInterceptor {
   constructor(private loadingService: LoadingService) {}
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    // Verificar si la petición tiene el header X-Skip-Loading
+    const skipLoading = req.headers.has('X-Skip-Loading');
+    
+    // Si tiene el header, removerlo antes de enviar la petición
+    if (skipLoading) {
+      req = req.clone({
+        headers: req.headers.delete('X-Skip-Loading')
+      });
+    }
+    
     // Lista de endpoints que NO deberían mostrar loading
     const excludedUrls = [
       '/api/health',
@@ -22,7 +32,7 @@ export class LoadingInterceptor implements HttpInterceptor {
     ];
 
     // Verificar si la URL debe ser excluida
-    const shouldShowLoading = !excludedUrls.some(url => req.url.includes(url));
+    const shouldShowLoading = !skipLoading && !excludedUrls.some(url => req.url.includes(url));
 
     if (shouldShowLoading) {
       // Mostrar loading antes de la petición

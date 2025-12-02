@@ -69,37 +69,28 @@ public class WorkerAuthorizationService : IWorkerAuthorizationService
         if (message.TenantId != _workerConfig.TenantId)
         {
             _lastFailureReason = $"Worker belongs to tenant {_workerConfig.TenantId} but job is for tenant {message.TenantId}";
-            _logger.LogWarning("Authorization failed for backup job {BackupExecutionId}: {Reason}", 
-                message.BackupExecutionId, _lastFailureReason);
+            _logger.LogWarning("Authorization failed for backup job {JobId}: {Reason}", 
+                message.JobId, _lastFailureReason);
             return Task.FromResult(false);
         }
 
         // Validate database type support
-        var databaseTypeString = message.Type.ToString();
+        var databaseTypeString = message.DatabaseConnection.DatabaseType;
         if (!_workerConfig.SupportedDatabaseTypes.Contains(databaseTypeString, StringComparer.OrdinalIgnoreCase))
         {
             _lastFailureReason = $"Worker does not support database type {databaseTypeString}. Supported types: [{string.Join(", ", _workerConfig.SupportedDatabaseTypes)}]";
-            _logger.LogWarning("Authorization failed for backup job {BackupExecutionId}: {Reason}", 
-                message.BackupExecutionId, _lastFailureReason);
+            _logger.LogWarning("Authorization failed for backup job {JobId}: {Reason}", 
+                message.JobId, _lastFailureReason);
             return Task.FromResult(false);
         }
 
-        // Validate based on assignment mode
-        var isAuthorized = ValidateAssignment(
-            message.AssignmentMode, 
-            message.AssignedWorkerId, 
-            message.Tags,
-            $"backup job {message.BackupExecutionId}");
+        // Worker is authorized if tenant and database type match
+        _logger.LogInformation(
+            "Worker {WorkerId} ({WorkerName}) authorized to process backup job {JobId} (Database: {DatabaseType})",
+            _workerConfig.WorkerId, _workerConfig.WorkerName, message.JobId, 
+            message.DatabaseConnection.DatabaseType);
 
-        if (isAuthorized)
-        {
-            _logger.LogInformation(
-                "Worker {WorkerId} ({WorkerName}) authorized to process backup job {BackupExecutionId} (Mode: {Mode}, Database: {DatabaseType})",
-                _workerConfig.WorkerId, _workerConfig.WorkerName, message.BackupExecutionId, 
-                message.AssignmentMode, message.Type);
-        }
-
-        return Task.FromResult(isAuthorized);
+        return Task.FromResult(true);
     }
 
     public string GetAuthorizationFailureReason()

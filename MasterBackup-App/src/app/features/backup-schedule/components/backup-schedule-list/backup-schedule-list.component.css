@@ -1,0 +1,27 @@
+/* Badge animations */
+.badge {
+  transition: all 0.3s ease;
+}
+
+.menu-link:hover {
+  background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+/* Symbol with icon */
+.symbol-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .d-flex.gap-2 {
+    flex-direction: column;
+  }
+  
+  .form-control-sm,
+  .form-select-sm {
+    width: 100% !important;
+  }
+}

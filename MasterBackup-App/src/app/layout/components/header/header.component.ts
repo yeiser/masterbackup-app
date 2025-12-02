@@ -34,6 +34,10 @@ export class HeaderComponent implements OnInit {
     '/databases': { 
       title: 'Bases de Datos', 
       icon: 'fa-database'
+    },
+    '/triggers': {
+      title: 'Disparadores', 
+      icon: 'fa fa-calendar-alt'
     }
   };
 

@@ -20,7 +20,7 @@ export interface DatabaseConnectionDto {
   id: string;
   name: string;
   description?: string;
-  type: DatabaseType;
+  type: DatabaseType | string; // Backend envía como string
   host: string;
   port: number;
   database: string;
@@ -33,7 +33,7 @@ export interface DatabaseConnectionDto {
   lastTestStatus?: string;
   assignedWorkerId?: string;
   tags?: string[];
-  assignmentMode?: WorkerAssignmentMode;
+  assignmentMode?: WorkerAssignmentMode | string; // Backend envía como string
   createdBy: string;
   createdByName: string;
   createdAt: string;

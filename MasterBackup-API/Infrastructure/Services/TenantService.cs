@@ -77,6 +77,7 @@ public class TenantService : ITenantService
             // Extract components from master connection string
             var builder = new Npgsql.NpgsqlConnectionStringBuilder(masterConnectionString);
             builder.Database = dbName;
+            builder.SearchPath = "public"; // Ensure schema is set for PostgreSQL
             var tenantConnectionString = builder.ConnectionString;
 
             _logger.LogInformation($"Tenant connection string created: Database={dbName}");

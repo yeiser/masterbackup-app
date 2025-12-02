@@ -23,7 +23,7 @@ public interface IApiClient
     /// <summary>
     /// Registers the worker with the API
     /// </summary>
-    Task<(bool Success, Guid WorkerId, string Message)> RegisterWorkerAsync(
+    Task<(bool Success, Guid WorkerId, Guid TenantId, string Message)> RegisterWorkerAsync(
         string name,
         string? hostname,
         string? osInfo,

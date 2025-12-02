@@ -22,7 +22,9 @@ public class RabbitMQConsumerService : BackgroundService
     private readonly WorkerConfiguration _workerConfig;
     private IConnection? _connection;
     private IModel? _channel;
-    private readonly string _queueName;
+    private string? _queueName;
+    private readonly string _rabbitMQHost;
+    private readonly int _rabbitMQPort;
 
     public RabbitMQConsumerService(
         ILogger<RabbitMQConsumerService> logger,
@@ -40,16 +42,37 @@ public class RabbitMQConsumerService : BackgroundService
         _backupExecutorService = backupExecutorService ?? throw new ArgumentNullException(nameof(backupExecutorService));
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
         _workerConfig = workerConfig ?? throw new ArgumentNullException(nameof(workerConfig));
+        _rabbitMQHost = rabbitMQHost;
+        _rabbitMQPort = rabbitMQPort;
 
-        // Queue name format: {tenantId}.test-connection.queue
-        // Note: This queue is used for both test connections and backup jobs
-        _queueName = $"{workerConfig.TenantId}.test-connection.queue";
+        _logger.LogInformation("RabbitMQ Consumer service created. Will initialize after worker registration.");
+    }
 
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        // Wait for worker to be registered (WorkerId and TenantId will be set by WorkerRegistrationService)
+        _logger.LogInformation("Waiting for worker registration to complete...");
+        while (_workerConfig.WorkerId == Guid.Empty && !stoppingToken.IsCancellationRequested)
+        {
+            await Task.Delay(1000, stoppingToken);
+        }
+        
+        if (_workerConfig.WorkerId == Guid.Empty)
+        {
+            _logger.LogError("Worker registration failed. RabbitMQ consumer will not start.");
+            return;
+        }
+        
+        _logger.LogInformation("Worker registered with ID: {WorkerId}. Initializing RabbitMQ connection...", _workerConfig.WorkerId);
+        
+        // NOW we can determine the queue name with the correct TenantId
+        _queueName = $"{_workerConfig.TenantId}.test-connection.queue";
+        
         // Initialize RabbitMQ connection
         var factory = new ConnectionFactory
         {
-            HostName = rabbitMQHost,
-            Port = rabbitMQPort,
+            HostName = _rabbitMQHost,
+            Port = _rabbitMQPort,
             UserName = "guest",
             Password = "guest",
             AutomaticRecoveryEnabled = true,
@@ -68,13 +91,18 @@ public class RabbitMQConsumerService : BackgroundService
             arguments: null);
 
         // Set prefetch count to limit concurrent processing
-        _channel.BasicQos(prefetchSize: 0, prefetchCount: (ushort)workerConfig.MaxConcurrentJobs, global: false);
+        _channel.BasicQos(prefetchSize: 0, prefetchCount: (ushort)_workerConfig.MaxConcurrentJobs, global: false);
 
-        _logger.LogInformation("RabbitMQ consumer initialized for queue: {QueueName}", _queueName);
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
+        _logger.LogInformation("═══════════════════════════════════════════════════════════");
+        _logger.LogInformation("RabbitMQ Consumer Initialized Successfully");
+        _logger.LogInformation("═══════════════════════════════════════════════════════════");
+        _logger.LogInformation("Queue Name:  {QueueName}", _queueName);
+        _logger.LogInformation("Host:        {Host}:{Port}", _rabbitMQHost, _rabbitMQPort);
+        _logger.LogInformation("Tenant ID:   {TenantId}", _workerConfig.TenantId);
+        _logger.LogInformation("Worker ID:   {WorkerId}", _workerConfig.WorkerId);
+        _logger.LogInformation("Max Jobs:    {MaxJobs}", _workerConfig.MaxConcurrentJobs);
+        _logger.LogInformation("═══════════════════════════════════════════════════════════");
+        
         var consumer = new EventingBasicConsumer(_channel);
         
         consumer.Received += async (model, ea) =>
@@ -84,11 +112,14 @@ public class RabbitMQConsumerService : BackgroundService
                 var body = ea.Body.ToArray();
                 var messageJson = Encoding.UTF8.GetString(body);
                 
-                _logger.LogInformation("Received message from queue {QueueName}: {Message}", 
-                    _queueName, messageJson);
+                _logger.LogInformation("╔═══════════════════════════════════════════════════════════╗");
+                _logger.LogInformation("║  📩 NEW MESSAGE RECEIVED from queue {QueueName}", _queueName);
+                _logger.LogInformation("╚═══════════════════════════════════════════════════════════╝");
+                _logger.LogInformation("Message Content: {Message}", messageJson);
 
                 // Determine message type and process accordingly
                 var messageType = DetermineMessageType(messageJson);
+                _logger.LogInformation("Message type determined: {MessageType}", messageType);
                 
                 var processed = messageType switch
                 {
@@ -96,6 +127,8 @@ public class RabbitMQConsumerService : BackgroundService
                     "BackupJob" => await ProcessBackupJobMessageAsync(messageJson),
                     _ => false
                 };
+                
+                _logger.LogInformation("Message processed: {Processed}", processed);
 
                 if (processed)
                 {
@@ -123,7 +156,10 @@ public class RabbitMQConsumerService : BackgroundService
             autoAck: false,
             consumer: consumer);
 
-        _logger.LogInformation("RabbitMQ consumer started listening on queue: {QueueName}", _queueName);
+        _logger.LogInformation("╔═══════════════════════════════════════════════════════════╗");
+        _logger.LogInformation("║  ✓ RabbitMQ Consumer ACTIVE - Listening for messages     ║");
+        _logger.LogInformation("╚═══════════════════════════════════════════════════════════╝");
+        _logger.LogInformation("Waiting for messages on queue: {QueueName}...", _queueName);
 
         // Keep the service running until cancellation is requested
         try
@@ -207,37 +243,22 @@ public class RabbitMQConsumerService : BackgroundService
             if (!isAuthorized)
             {
                 var reason = _authorizationService.GetAuthorizationFailureReason();
-                _logger.LogWarning("Worker {WorkerId} is not authorized to process backup job {BackupExecutionId}: {Reason}",
-                    _workerConfig.WorkerId, message.BackupExecutionId, reason);
+                _logger.LogWarning("Worker {WorkerId} is not authorized to process backup job {JobId}: {Reason}",
+                    _workerConfig.WorkerId, message.JobId, reason);
                 
                 // Return false to requeue - another worker might be authorized
                 return false;
             }
 
             // Execute backup job
-            _logger.LogInformation("Processing backup job {BackupExecutionId} on worker {WorkerId}",
-                message.BackupExecutionId, _workerConfig.WorkerId);
+            _logger.LogInformation("Processing backup job {JobId} on worker {WorkerId}",
+                message.JobId, _workerConfig.WorkerId);
 
-            // Update status to InProgress
-            await _apiClient.UpdateBackupExecutionStatusAsync(message.BackupExecutionId, "InProgress");
-
-            var (success, filePath, fileSize, backupMessage) = await _backupExecutorService.ExecuteBackupAsync(message);
-
-            if (success)
-            {
-                await _apiClient.UpdateBackupExecutionStatusAsync(message.BackupExecutionId, "Completed");
-                await _apiClient.UploadBackupFileMetadataAsync(message.BackupExecutionId, filePath, filePath, fileSize);
-                
-                _logger.LogInformation("Backup job {BackupExecutionId} completed successfully",
-                    message.BackupExecutionId);
-            }
-            else
-            {
-                await _apiClient.UpdateBackupExecutionStatusAsync(message.BackupExecutionId, "Failed", backupMessage);
-                
-                _logger.LogWarning("Backup job {BackupExecutionId} failed: {Message}",
-                    message.BackupExecutionId, backupMessage);
-            }
+            // BackupExecutorService now handles all status reporting via IBackupStatusReporter
+            await _backupExecutorService.ExecuteBackupAsync(message);
+            
+            _logger.LogInformation("Backup job {JobId} processing completed",
+                message.JobId);
 
             return true;
         }
@@ -250,13 +271,22 @@ public class RabbitMQConsumerService : BackgroundService
 
     private string DetermineMessageType(string messageJson)
     {
+        _logger.LogDebug("Determining message type for: {Message}", messageJson);
+        
         // Simple heuristic: check if message contains BackupExecutionId or ConnectionId
         if (messageJson.Contains("BackupExecutionId", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("Message identified as BackupJob");
             return "BackupJob";
+        }
         
         if (messageJson.Contains("ConnectionId", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("Message identified as TestConnection");
             return "TestConnection";
+        }
 
+        _logger.LogWarning("Unknown message type. Message does not contain BackupExecutionId or ConnectionId");
         return "Unknown";
     }
 

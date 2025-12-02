@@ -7,7 +7,7 @@
       <!-- Card toolbar -->
       <div class="card-toolbar">
         <div
-          class="d-flex justify-content-between gap-2"
+          class="d-flex justify-content-end gap-2"
           data-kt-customer-table-toolbar="base"
         >
         <button
@@ -499,7 +499,7 @@
                 class="form-select form-select-solid"
                 formControlName="assignmentMode"
               >
-                <option *ngFor="let mode of workerAssignmentModes" [value]="mode.value">
+                <option *ngFor="let mode of workerAssignmentModes" [ngValue]="mode.value">
                   {{ mode.label }}
                 </option>
               </select>
@@ -507,15 +507,15 @@
             </div>
 
             <!-- Worker Dedicado -->
-            <div class="fv-row mb-7" *ngIf="connectionForm.get('assignmentMode')?.value == 2">
+            <div class="fv-row mb-7" *ngIf="connectionForm.get('assignmentMode')?.value == WorkerAssignmentMode.Dedicated">
               <label class="required fs-6 fw-semibold mb-2">Worker Asignado</label>
               <select
                 class="form-select form-select-solid"
                 formControlName="assignedWorkerId"
                 [class.is-invalid]="isFieldInvalid('assignedWorkerId')"
               >
-                <option [value]="null" disabled>Seleccionar worker...</option>
-                <option *ngFor="let worker of workers" [value]="worker.id">
+                <option [ngValue]="null">Seleccionar worker...</option>
+                <option *ngFor="let worker of workers" [ngValue]="worker.id">
                   {{ worker.name }} - {{ worker.hostname }}
                 </option>
               </select>
