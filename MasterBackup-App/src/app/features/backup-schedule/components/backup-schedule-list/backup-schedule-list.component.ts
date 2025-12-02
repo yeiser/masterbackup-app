@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } 
 import { BackupScheduleService } from '../../services/backup-schedule.service';
 import { DatabaseConnectionService } from '../../../databases/services/database-connection.service';
 import { DatabaseConnectionDto } from '../../../databases/models/database-connection.models';
+import { BackupExecutionService } from '../../../backup-execution/services/backup-execution.service';
 import Swal from 'sweetalert2';
 import { 
   BackupScheduleDto,
@@ -88,7 +89,8 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
   constructor(
     private fb: FormBuilder,
     private scheduleService: BackupScheduleService,
-    private databaseService: DatabaseConnectionService
+    private databaseService: DatabaseConnectionService,
+    private backupExecutionService: BackupExecutionService
   ) {}
 
   ngOnInit(): void {
@@ -466,28 +468,97 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
   executeNow(schedule: BackupScheduleDto): void {
     Swal.fire({
       title: '¿Ejecutar backup ahora?',
-      html: `¿Deseas ejecutar el backup programado <strong>${schedule.name}</strong> de forma inmediata?`,
+      html: `
+        <div class="text-start">
+          <p>¿Deseas ejecutar un backup instantáneo de:</p>
+          <div class="alert alert-light-primary d-flex align-items-center mt-3 mb-3">
+            <i class="fa fa-database fs-2x text-primary me-3"></i>
+            <div>
+              <div class="fw-bold fs-5">${schedule.name}</div>
+              <div class="text-muted fs-7">${schedule.databaseConnectionName}</div>
+            </div>
+          </div>
+          <p class="text-muted fs-7">
+            <i class="fa fa-info-circle me-1"></i>
+            El backup se ejecutará inmediatamente y podrás ver su progreso en el historial de backups.
+          </p>
+        </div>
+      `,
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Sí, ejecutar',
-      cancelButtonText: 'Cancelar',
+      confirmButtonText: '<i class="fa fa-play me-2"></i>Sí, ejecutar ahora',
+      cancelButtonText: '<i class="fa fa-times me-2"></i>Cancelar',
       buttonsStyling: false,
       customClass: {
         confirmButton: 'btn btn-primary',
-        cancelButton: 'btn btn-secondary'
-      }
+        cancelButton: 'btn btn-light'
+      },
+      showLoaderOnConfirm: true,
+      preConfirm: () => {
+        return this.backupExecutionService.executeInstantBackup({
+          databaseConnectionId: schedule.databaseConnectionId,
+          compressionType: 'GZIP',
+          timeoutMinutes: schedule.timeoutMinutes,
+          maxRetries: schedule.maxRetries
+        }).toPromise()
+        .then(response => {
+          return response;
+        })
+        .catch(error => {
+          Swal.showValidationMessage(
+            `Error: ${error.error?.message || error.message || 'No se pudo ejecutar el backup'}`
+          );
+        });
+      },
+      allowOutsideClick: () => !Swal.isLoading()
     }).then((result) => {
-      if (result.isConfirmed) {
-        this.scheduleService.executeNow(schedule.id).subscribe({
-          next: () => {
-            this.showSuccessAlert(`Backup "${schedule.name}" ejecutándose...`);
-            this.loadSchedules();
-          },
-          error: (error) => {
-            console.error('Error ejecutando backup:', error);
-            this.showErrorAlert('Error al ejecutar el backup');
+      if (result.isConfirmed && result.value) {
+        Swal.fire({
+          icon: 'success',
+          title: '¡Backup en cola!',
+          html: `
+            <div class="text-start">
+              <p class="mb-3">El backup se ha encolado exitosamente:</p>
+              <div class="alert alert-light-success">
+                <div class="d-flex align-items-center mb-2">
+                  <i class="fa fa-check-circle text-success me-2"></i>
+                  <span class="fw-bold">Estado:</span>
+                  <span class="ms-2">En cola</span>
+                </div>
+                <div class="d-flex align-items-center mb-2">
+                  <i class="fa fa-fingerprint text-primary me-2"></i>
+                  <span class="fw-bold">Job ID:</span>
+                  <code class="ms-2">${result.value.jobId.substring(0, 8)}...</code>
+                </div>
+                <div class="d-flex align-items-center">
+                  <i class="fa fa-clock text-info me-2"></i>
+                  <span class="fw-bold">Hora:</span>
+                  <span class="ms-2">${new Date(result.value.queuedAt).toLocaleString('es-ES')}</span>
+                </div>
+              </div>
+              <p class="text-muted fs-7 mb-0">
+                <i class="fa fa-info-circle me-1"></i>
+                ${result.value.message}
+              </p>
+            </div>
+          `,
+          confirmButtonText: '<i class="fa fa-history me-2"></i>Ver historial',
+          showCancelButton: true,
+          cancelButtonText: 'Cerrar',
+          buttonsStyling: false,
+          customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-light'
+          }
+        }).then((historyResult) => {
+          if (historyResult.isConfirmed) {
+            // Navegar al historial de backups
+            window.location.href = '/backup-history';
           }
         });
+        
+        // Refrescar la lista de schedules
+        this.loadSchedules();
       }
     });
   }

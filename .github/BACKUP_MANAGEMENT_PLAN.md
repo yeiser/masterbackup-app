@@ -444,26 +444,74 @@ Application/Features/Backups/
 
 ### 6.2 Frontend - Instant Backup
 
-**Componente:**
+**Estructura Actual Implementada:**
 ```typescript
-src/app/features/backups/
-└── components/
-    └── instant-backup-modal/
+src/app/features/backup-execution/
+├── components/
+│   └── backup-execution-list/
+│       ├── backup-execution-list.component.ts (599 líneas)
+│       ├── backup-execution-list.component.html
+│       ├── backup-execution-list.component.css
+│       └── backup-execution-list.component.spec.ts
+├── models/
+│   └── backup-history.models.ts
+└── services/
+    └── backup-history.service.ts
 ```
 
-**Características:**
-- Modal para seleccionar DatabaseConnection
-- Botón "Ejecutar Ahora"
-- Progreso en tiempo real via SignalR
-- Notificación al completar
+**Características Implementadas:**
+- ✅ Lista completa de historial de backups con paginación
+- ✅ Vista de estadísticas con métricas y gráficos
+- ✅ Filtros avanzados (BD, programación, estado, fechas, tipo)
+- ✅ Acciones individuales: Ver detalles, Reintentar, Descargar, Eliminar
+- ✅ Operaciones en lote: Selección múltiple, Eliminación masiva
+- ✅ Integración completa con BackupHistoryController (8 endpoints)
+- ✅ SweetAlert2 para confirmaciones y modales de detalles
+- ✅ UI Metronic con animaciones y efectos hover
+- ✅ Badges de estado con iconos FontAwesome
+- ✅ Formateo de fechas, tamaños y duraciones
+- ✅ KTMenu para menús de acciones por registro
+- ✅ Reinicialización automática de menús en actualizaciones
 
-**Tareas:**
-- [ ] Crear `BackupService`
-- [ ] Crear modal de instant backup
-- [ ] Integrar con SignalR para progreso
-- [ ] Toast notifications al completar
-- [ ] Botón en lista de DatabaseConnections
-- [ ] Testing E2E
+**Pendiente para Completar Fase 6.2:**
+- [ ] Crear modal de "Instant Backup" para ejecutar backup manual
+  - Componente: `instant-backup-modal.component.ts`
+  - Ubicación: `src/app/features/backup-execution/components/instant-backup-modal/`
+  - Funcionalidad:
+    - Modal con SweetAlert2 o modal Metronic
+    - Selector de DatabaseConnection
+    - Opciones: Tipo de compresión, timeout, reintentos
+    - Botón "Ejecutar Ahora"
+    - Indicador de progreso mientras se encola
+
+- [ ] Agregar botón "Ejecutar Backup Instantáneo" en:
+  - Lista de DatabaseConnections (botón por conexión)
+  - Header de BackupExecutionListComponent
+  - DatabaseConnection details view
+
+- [ ] Integrar con ExecuteInstantBackupCommand del backend
+  - Endpoint: POST `/api/backups/execute-instant`
+  - Payload: `{ databaseConnectionId, compressionType?, timeoutMinutes?, maxRetries? }`
+
+- [ ] Implementar monitoreo en tiempo real con SignalR
+  - Conectar a BackupNotificationHub
+  - Escuchar eventos: BackupStarted, BackupProgress, BackupCompleted, BackupFailed
+  - Actualizar lista automáticamente al recibir notificaciones
+  - Mostrar toast notifications para eventos importantes
+
+- [ ] Agregar indicador visual de backups en progreso
+  - Badge "En Progreso" con spinner animado
+  - Progress bar si hay % de completado
+  - Tiempo transcurrido en tiempo real
+
+- [ ] Testing E2E del flujo completo:
+  - Abrir modal → Seleccionar BD → Ejecutar → Monitorear → Ver resultado
+
+**Mejoras Sugeridas:**
+- [ ] Botón "Ejecutar Ahora" en cada backup schedule de la lista
+- [ ] Quick action panel en dashboard con "Backup Instantáneo"
+- [ ] Historial de últimos 5 backups instantáneos en sidebar
+- [ ] Notificaciones desktop con Notification API del navegador
 
 ---
 
