@@ -38,6 +38,10 @@ export class HeaderComponent implements OnInit {
     '/triggers': {
       title: 'Disparadores', 
       icon: 'fa fa-calendar-alt'
+    },
+    '/activity': { 
+      title: 'Actividad', 
+      icon: 'fa-heartbeat' 
     }
   };
 

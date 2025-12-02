@@ -1,0 +1,510 @@
+<!-- Alert Section -->
+<div *ngIf="alertVisible" class="alert" [ngClass]="{
+  'alert-success': alertType === 'success',
+  'alert-danger': alertType === 'error',
+  'alert-info': alertType === 'info'
+}" role="alert">
+  <div class="d-flex align-items-center">
+    <i class="fas me-2" [ngClass]="{
+      'fa-check-circle': alertType === 'success',
+      'fa-exclamation-circle': alertType === 'error',
+      'fa-info-circle': alertType === 'info'
+    }"></i>
+    <div class="flex-grow-1">{{ alertMessage }}</div>
+    <button type="button" class="btn-close" (click)="closeAlert()"></button>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="d-flex flex-wrap flex-stack mb-6">
+  
+  <div class="d-flex align-items-center">
+    <!-- View Mode Buttons -->
+    <div class="btn-group me-3">
+      <button type="button" 
+              class="btn btn-sm"
+              [ngClass]="viewMode === 'list' ? 'btn-primary' : 'btn-light-primary'"
+              (click)="changeView('list')"
+              title="Vista de Lista">
+        <i class="fas fa-list"></i>
+      </button>
+      <button type="button" 
+              class="btn btn-sm"
+              [ngClass]="viewMode === 'grouped' ? 'btn-primary' : 'btn-light-primary'"
+              (click)="changeView('grouped')"
+              title="Vista Agrupada">
+        <i class="fas fa-layer-group"></i>
+      </button>
+      <button type="button" 
+              class="btn btn-sm"
+              [ngClass]="viewMode === 'statistics' ? 'btn-primary' : 'btn-light-primary'"
+              (click)="changeView('statistics')"
+              title="Estadísticas">
+        <i class="fas fa-chart-bar"></i>
+      </button>
+    </div>
+
+    <!-- Refresh Button -->
+    <button type="button" 
+            class="btn btn-sm btn-light-primary me-3"
+            (click)="refresh()">
+      <i class="fas fa-sync-alt"></i>
+      Actualizar
+    </button>
+
+    <!-- Delete Selected Button -->
+    <button type="button" 
+            *ngIf="selectedBackups.size > 0"
+            class="btn btn-sm btn-danger"
+            (click)="deleteSelectedBackups()">
+      <i class="fas fa-trash-alt"></i>
+      Eliminar ({{ selectedBackups.size }})
+    </button>
+  </div>
+</div>
+
+<!-- Statistics View -->
+<div *ngIf="viewMode === 'statistics' && statistics" class="row g-5 mb-6">
+  <!-- Overview Cards -->
+  <div class="col-xl-3 col-md-6">
+    <div class="card card-flush h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div class="d-flex align-items-center mb-3">
+          <i class="fas fa-database fs-2x text-primary me-3"></i>
+          <div>
+            <div class="fs-2hx fw-bold text-dark">{{ statistics.totalBackups }}</div>
+            <div class="fs-6 text-gray-600">Total de Backups</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-3 col-md-6">
+    <div class="card card-flush h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div class="d-flex align-items-center mb-3">
+          <i class="fas fa-check-circle fs-2x text-success me-3"></i>
+          <div>
+            <div class="fs-2hx fw-bold text-success">{{ statistics.successfulBackups }}</div>
+            <div class="fs-6 text-gray-600">Exitosos</div>
+          </div>
+        </div>
+        <div class="progress h-6px bg-light-success">
+          <div class="progress-bar bg-success" 
+               role="progressbar" 
+               [style.width.%]="statistics.successRate"></div>
+        </div>
+        <div class="fs-7 text-gray-600 mt-2">{{ statistics.successRate.toFixed(1) }}% tasa de éxito</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-3 col-md-6">
+    <div class="card card-flush h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div class="d-flex align-items-center mb-3">
+          <i class="fas fa-times-circle fs-2x text-danger me-3"></i>
+          <div>
+            <div class="fs-2hx fw-bold text-danger">{{ statistics.failedBackups }}</div>
+            <div class="fs-6 text-gray-600">Fallidos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-3 col-md-6">
+    <div class="card card-flush h-100">
+      <div class="card-body d-flex flex-column justify-content-between">
+        <div class="d-flex align-items-center mb-3">
+          <i class="fas fa-hdd fs-2x text-info me-3"></i>
+          <div>
+            <div class="fs-2hx fw-bold text-dark">{{ statistics.totalBackupSizeGB.toFixed(2) }} GB</div>
+            <div class="fs-6 text-gray-600">Tamaño Total</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Additional Stats -->
+  <div class="col-xl-6">
+    <div class="card card-flush h-100">
+      <div class="card-header pt-7">
+        <h3 class="card-title align-items-start flex-column">
+          <span class="card-label fw-bold text-dark">Duraciones</span>
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-gray-600">Promedio:</span>
+            <span class="fw-bold">{{ formatDuration(statistics.averageDuration) }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-gray-600">Mínima:</span>
+            <span class="fw-bold text-success">{{ formatDuration(statistics.minDuration) }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-gray-600">Máxima:</span>
+            <span class="fw-bold text-danger">{{ formatDuration(statistics.maxDuration) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card card-flush h-100">
+      <div class="card-header pt-7">
+        <h3 class="card-title align-items-start flex-column">
+          <span class="card-label fw-bold text-dark">Últimos Backups</span>
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-gray-600">Último Exitoso:</span>
+            <span class="fw-bold text-success">
+              {{ statistics.lastSuccessfulBackup ? formatDateTime(statistics.lastSuccessfulBackup) : 'N/A' }}
+            </span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-gray-600">Último Fallido:</span>
+            <span class="fw-bold text-danger">
+              {{ statistics.lastFailedBackup ? formatDateTime(statistics.lastFailedBackup) : 'N/A' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Breakdown -->
+  <div class="col-12">
+    <div class="card card-flush">
+      <div class="card-header pt-7">
+        <h3 class="card-title align-items-start flex-column">
+          <span class="card-label fw-bold text-dark">Desglose por Estado</span>
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-3" *ngFor="let breakdown of statistics.statusBreakdown">
+            <div class="d-flex flex-column mb-5">
+              <div class="d-flex justify-content-between mb-2">
+                <span class="badge" [ngClass]="getStatusBadgeClass(breakdown.status)">
+                  {{ breakdown.statusText }}
+                </span>
+                <span class="fw-bold">{{ breakdown.count }}</span>
+              </div>
+              <div class="progress h-6px">
+                <div class="progress-bar" 
+                     [ngClass]="'bg-' + getStatusBadgeClass(breakdown.status).replace('badge-', '')"
+                     role="progressbar" 
+                     [style.width.%]="breakdown.percentage"></div>
+              </div>
+              <span class="fs-7 text-gray-600 mt-1">{{ breakdown.percentage.toFixed(1) }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters Card -->
+<div class="card card-flush mb-6">
+  <div class="card-header cursor-pointer" (click)="showFilters = !showFilters">
+    <div class="card-title">
+      <i class="fas fa-filter text-primary me-2"></i>
+      <span class="fw-bold">Filtros</span>
+    </div>
+    <div class="card-toolbar">
+      <i class="fas" [ngClass]="showFilters ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+    </div>
+  </div>
+  
+  <div class="card-body" [class.d-none]="!showFilters">
+    <form [formGroup]="filterForm">
+      <div class="row g-4">
+        <!-- Database Connection Filter -->
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Base de Datos</label>
+          <select class="form-select form-select-sm" formControlName="databaseConnectionId">
+            <option value="">Todas</option>
+            <option *ngFor="let conn of databaseConnections" [value]="conn.id">
+              {{ conn.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Schedule Filter -->
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Programación</label>
+          <select class="form-select form-select-sm" formControlName="backupScheduleId">
+            <option value="">Todas</option>
+            <option *ngFor="let schedule of backupSchedules" [value]="schedule.id">
+              {{ schedule.name }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Status Filter -->
+        <div class="col-md-2">
+          <label class="form-label fw-semibold">Estado</label>
+          <select class="form-select form-select-sm" formControlName="status">
+            <option value="">Todos</option>
+            <option [value]="BackupStatus.Completed">Completado</option>
+            <option [value]="BackupStatus.Failed">Fallido</option>
+            <option [value]="BackupStatus.InProgress">En Progreso</option>
+            <option [value]="BackupStatus.Pending">Pendiente</option>
+            <option [value]="BackupStatus.Cancelled">Cancelado</option>
+          </select>
+        </div>
+
+        <!-- Type Filter -->
+        <div class="col-md-2">
+          <label class="form-label fw-semibold">Tipo</label>
+          <select class="form-select form-select-sm" formControlName="isInstantBackup">
+            <option value="">Todos</option>
+            <option value="true">Manual</option>
+            <option value="false">Programado</option>
+          </select>
+        </div>
+
+        <!-- Sort By -->
+        <div class="col-md-2">
+          <label class="form-label fw-semibold">Ordenar por</label>
+          <select class="form-select form-select-sm" formControlName="sortBy">
+            <option value="StartTime">Fecha de Inicio</option>
+            <option value="EndTime">Fecha de Fin</option>
+            <option value="Duration">Duración</option>
+            <option value="BackupSizeBytes">Tamaño</option>
+          </select>
+        </div>
+
+        <!-- Date From -->
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Fecha Desde</label>
+          <input type="date" class="form-control form-control-sm" formControlName="startDateFrom">
+        </div>
+
+        <!-- Date To -->
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Fecha Hasta</label>
+          <input type="date" class="form-control form-control-sm" formControlName="startDateTo">
+        </div>
+
+        <!-- Sort Direction -->
+        <div class="col-md-2">
+          <label class="form-label fw-semibold">Dirección</label>
+          <select class="form-select form-select-sm" formControlName="sortDirection">
+            <option value="DESC">Descendente</option>
+            <option value="ASC">Ascendente</option>
+          </select>
+        </div>
+
+        <!-- Clear Filters Button -->
+        <div class="col-md-4 d-flex align-items-end">
+          <button type="button" 
+                  class="btn btn-sm btn-light-danger w-100"
+                  (click)="clearFilters()">
+            <i class="fas fa-times me-2"></i>
+            Limpiar Filtros
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- List View -->
+<div *ngIf="viewMode === 'list'" class="card card-flush">
+  <div class="card-header pt-7">
+    <div class="card-title">
+      <h3 class="fw-bold">
+        Registros de Backups
+        <span class="badge badge-light-primary ms-2">{{ totalCount }}</span>
+      </h3>
+    </div>
+  </div>
+  
+  <div class="card-body pt-0">
+    <!-- Table -->
+    <div class="table-responsive">
+      <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+        <thead>
+          <tr class="fw-bold text-muted">
+            <th class="w-25px">
+              <div class="form-check form-check-sm form-check-custom form-check-solid">
+                <input class="form-check-input" 
+                       type="checkbox" 
+                       [checked]="selectAll"
+                       (change)="toggleSelectAll()">
+              </div>
+            </th>
+            <th class="min-w-150px">Base de Datos</th>
+            <th class="min-w-120px">Programación</th>
+            <th class="min-w-100px">Estado</th>
+            <th class="min-w-80px">Tipo</th>
+            <th class="min-w-120px">Inicio</th>
+            <th class="min-w-100px">Duración</th>
+            <th class="min-w-100px">Tamaño</th>
+            <th class="min-w-80px text-end">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let backup of filteredBackupHistories">
+            <td>
+              <div class="form-check form-check-sm form-check-custom form-check-solid">
+                <input class="form-check-input" 
+                       type="checkbox" 
+                       [checked]="isSelected(backup.id)"
+                       (change)="toggleSelection(backup.id)">
+              </div>
+            </td>
+            <td>
+              <div class="d-flex align-items-center">
+                <i class="fas fa-database text-primary fs-4 me-2"></i>
+                <div class="d-flex flex-column">
+                  <span class="text-dark fw-bold text-hover-primary fs-6">
+                    {{ backup.databaseConnectionName }}
+                  </span>
+                  <span class="text-muted fw-semibold text-muted d-block fs-7">
+                    Job ID: {{ backup.jobId.substring(0, 8) }}...
+                  </span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span *ngIf="backup.backupScheduleName" class="text-dark fw-semibold d-block fs-6">
+                {{ backup.backupScheduleName }}
+              </span>
+              <span *ngIf="!backup.backupScheduleName" class="text-muted fs-7">
+                -
+              </span>
+            </td>
+            <td>
+              <span class="badge" [ngClass]="getStatusBadgeClass(backup.status)">
+                <i class="fas" [ngClass]="getStatusIcon(backup.status)" *ngIf="backup.status !== BackupStatus.InProgress"></i>
+                <i class="fas fa-spinner fa-spin" *ngIf="backup.status === BackupStatus.InProgress"></i>
+                {{ backup.statusText }}
+              </span>
+              <div *ngIf="backup.retryCount > 0" class="text-muted fs-7 mt-1">
+                <i class="fas fa-redo-alt"></i> {{ backup.retryCount }} reintentos
+              </div>
+            </td>
+            <td>
+              <span class="badge" [ngClass]="backup.isInstantBackup ? 'badge-light-info' : 'badge-light-primary'">
+                <i class="fas" [ngClass]="backup.isInstantBackup ? 'fa-hand-pointer' : 'fa-clock'"></i>
+                {{ backup.isInstantBackup ? 'Manual' : 'Programado' }}
+              </span>
+            </td>
+            <td>
+              <div class="d-flex flex-column">
+                <span class="text-dark fw-semibold d-block fs-6">
+                  {{ formatDateTime(backup.startTime) }}
+                </span>
+                <span *ngIf="backup.endTime" class="text-muted fw-semibold d-block fs-7">
+                  Fin: {{ formatDateTime(backup.endTime) }}
+                </span>
+              </div>
+            </td>
+            <td>
+              <span class="text-dark fw-semibold d-block fs-6">
+                {{ formatDuration(backup.duration) }}
+              </span>
+            </td>
+            <td>
+              <div class="d-flex flex-column">
+                <span class="text-dark fw-semibold d-block fs-6">
+                  {{ formatFileSize(backup.backupSizeMB) }}
+                </span>
+                <span *ngIf="backup.compressionType" class="text-muted fw-semibold d-block fs-7">
+                  {{ backup.compressionType }}
+                </span>
+              </div>
+            </td>
+            <td class="text-end">
+              <button class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1"
+                      data-kt-menu-trigger="click" 
+                      data-kt-menu-placement="bottom-end"
+                      data-kt-menu="true">
+                <i class="fas fa-ellipsis-v fs-4"></i>
+              </button>
+              
+              <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-200px py-4" 
+                   data-kt-menu="true">
+                <div class="menu-item px-3">
+                  <a class="menu-link px-3" (click)="viewBackupDetails(backup)">
+                    <i class="fas fa-eye text-primary me-2"></i>
+                    Ver Detalles
+                  </a>
+                </div>
+                <div class="menu-item px-3" *ngIf="backup.status === BackupStatus.Failed">
+                  <a class="menu-link px-3" (click)="retryBackup(backup)">
+                    <i class="fas fa-redo-alt text-warning me-2"></i>
+                    Reintentar
+                  </a>
+                </div>
+                <div class="menu-item px-3" *ngIf="backup.blobUrl">
+                  <a class="menu-link px-3" (click)="downloadBackup(backup)">
+                    <i class="fas fa-download text-info me-2"></i>
+                    Descargar
+                  </a>
+                </div>
+                <div class="separator my-2"></div>
+                <div class="menu-item px-3">
+                  <a class="menu-link px-3 text-danger" (click)="deleteBackup(backup)">
+                    <i class="fas fa-trash-alt me-2"></i>
+                    Eliminar
+                  </a>
+                </div>
+              </div>
+            </td>
+          </tr>
+          
+          <tr *ngIf="filteredBackupHistories.length === 0">
+            <td colspan="9" class="text-center py-10">
+              <div class="d-flex flex-column align-items-center">
+                <img src="assets/media/icons/duotune/general/gen002.svg" height="150" alt="No schedules"/>
+                <span class="text-muted fs-5">No se encontraron registros de backups</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="d-flex flex-stack flex-wrap pt-10" *ngIf="totalPages > 1">
+      <div class="fs-6 fw-semibold text-gray-700">
+        Mostrando {{ (currentPage - 1) * pageSize + 1 }} a 
+        {{ Math.min(currentPage * pageSize, totalCount) }} de 
+        {{ totalCount }} registros
+      </div>
+      
+      <ul class="pagination">
+        <li class="page-item" [class.disabled]="currentPage === 1">
+          <a class="page-link" (click)="previousPage()">
+            <i class="fas fa-chevron-left"></i>
+          </a>
+        </li>
+        
+        <li class="page-item" 
+            *ngFor="let page of getPageNumbers()" 
+            [class.active]="currentPage === page">
+          <a class="page-link" (click)="goToPage(page)">{{ page }}</a>
+        </li>
+        
+        <li class="page-item" [class.disabled]="currentPage === totalPages">
+          <a class="page-link" (click)="nextPage()">
+            <i class="fas fa-chevron-right"></i>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

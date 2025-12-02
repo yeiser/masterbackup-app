@@ -9,6 +9,7 @@ import { WorkersComponent } from './features/workers/component/workers/workers.c
 import { WrapperComponent } from './layout/components/wrapper/wrapper.component';
 import { authGuard } from './core/guards/auth.guard';
 import { BackupScheduleListComponent } from './features/backup-schedule/components/backup-schedule-list/backup-schedule-list.component';
+import { BackupExecutionListComponent } from './features/backup-execution/components/backup-execution-list/backup-execution-list.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
@@ -29,6 +30,7 @@ export const routes: Routes = [
       { path: 'databases', component: DatabasesComponent },
       { path: 'agents', component: WorkersComponent },
       { path: 'triggers', component: BackupScheduleListComponent },
+      { path: 'activity', component: BackupExecutionListComponent },
       // Agregar más rutas aquí
     ]
   }
