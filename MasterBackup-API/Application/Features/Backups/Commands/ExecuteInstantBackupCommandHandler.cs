@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MasterBackup_API.Application.Common.Interfaces;
 using MasterBackup_API.Domain.Entities;
@@ -19,6 +20,7 @@ public class ExecuteInstantBackupCommandHandler : IRequestHandler<ExecuteInstant
     private readonly ITenantContext _tenantContextService;
     private readonly IEncryptionService _encryptionService;
     private readonly ILogger<ExecuteInstantBackupCommandHandler> _logger;
+    private readonly string _azureStorageConnectionString;
 
     public ExecuteInstantBackupCommandHandler(
         TenantDbContext tenantContext,
@@ -27,7 +29,8 @@ public class ExecuteInstantBackupCommandHandler : IRequestHandler<ExecuteInstant
         INotificationService notificationService,
         ITenantContext tenantContextService,
         IEncryptionService encryptionService,
-        ILogger<ExecuteInstantBackupCommandHandler> logger)
+        ILogger<ExecuteInstantBackupCommandHandler> logger,
+        IConfiguration configuration)
     {
         _tenantContext = tenantContext;
         _messageQueueService = messageQueueService;
@@ -36,6 +39,11 @@ public class ExecuteInstantBackupCommandHandler : IRequestHandler<ExecuteInstant
         _tenantContextService = tenantContextService;
         _encryptionService = encryptionService;
         _logger = logger;
+        
+        // Get Azure Storage connection string from environment variable or configuration
+        _azureStorageConnectionString = Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING")
+                                        ?? configuration["AzureStorage:ConnectionString"]
+                                        ?? throw new InvalidOperationException("Azure Storage connection string not configured");
     }
 
     public async Task<ExecuteInstantBackupResult> Handle(ExecuteInstantBackupCommand request, CancellationToken cancellationToken)
@@ -96,13 +104,7 @@ public class ExecuteInstantBackupCommandHandler : IRequestHandler<ExecuteInstant
             // 7. Generate blob file name
             var blobFileName = GenerateBlobFileName(dbConnection, jobId);
 
-            // 8. Get blob storage connection string from configuration
-            var blobConnectionString = _blobStorageService.GetType()
-                .GetProperty("ConnectionString")?.GetValue(_blobStorageService)?.ToString()
-                ?? Environment.GetEnvironmentVariable("AzureStorage__ConnectionString")
-                ?? "UseDevelopmentStorage=true";
-
-            // 9. Build BackupJobMessage for RabbitMQ
+            // 8. Build BackupJobMessage for RabbitMQ
             var backupJobMessage = new BackupJobMessage
             {
                 JobId = jobId,
@@ -115,7 +117,7 @@ public class ExecuteInstantBackupCommandHandler : IRequestHandler<ExecuteInstant
                     ConnectionString = connectionString,
                     DatabaseType = dbConnection.Type.ToString()
                 },
-                BlobStorageConnectionString = blobConnectionString,
+                BlobStorageConnectionString = _azureStorageConnectionString,
                 ContainerName = $"backups-{tenantId.ToString().ToLowerInvariant()}",
                 BackupFileName = blobFileName,
                 TimeoutMinutes = request.TimeoutMinutes ?? 30,
@@ -126,13 +128,13 @@ public class ExecuteInstantBackupCommandHandler : IRequestHandler<ExecuteInstant
                 EncryptionKey = null // Optional: implement encryption key if needed
             };
 
-            // 10. Publish message to RabbitMQ
+            // 9. Publish message to RabbitMQ
             await _messageQueueService.PublishBackupJobAsync(tenantId, backupJobMessage);
 
             _logger.LogInformation("Published backup job {JobId} to RabbitMQ for Tenant {TenantId}",
                 jobId, tenantId);
 
-            // 11. Send SignalR notification to tenant
+            // 10. Send SignalR notification to tenant
             try
             {
                 var notification = new Application.Common.DTOs.BackupStartedDto
