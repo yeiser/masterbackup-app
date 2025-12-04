@@ -17,10 +17,13 @@ var configuration = new ConfigurationBuilder()
     .Build();
 
 // Load worker configuration
+var workerIdStr = Environment.GetEnvironmentVariable("Worker__WorkerId") ?? configuration["Worker:WorkerId"];
+var tenantIdStr = Environment.GetEnvironmentVariable("Worker__TenantId") ?? configuration["Worker:TenantId"];
+
 var workerConfig = new WorkerConfiguration
 {
-    WorkerId = Guid.Empty, // Will be assigned after registration
-    TenantId = Guid.Empty, // Will be assigned after registration from API
+    WorkerId = !string.IsNullOrEmpty(workerIdStr) ? Guid.Parse(workerIdStr) : Guid.Empty, // Will be assigned after registration if empty
+    TenantId = !string.IsNullOrEmpty(tenantIdStr) ? Guid.Parse(tenantIdStr) : Guid.Empty, // Will be assigned after registration from API
     WorkerName = configuration["Worker:WorkerName"] ?? "Worker-Unnamed",
     ApiKey = configuration["Worker:ApiKey"] ?? throw new InvalidOperationException("Worker:ApiKey not configured"),
     Tags = configuration.GetSection("Worker:Tags").Get<string[]>() ?? Array.Empty<string>(),
@@ -28,9 +31,13 @@ var workerConfig = new WorkerConfiguration
     MaxConcurrentJobs = int.Parse(configuration["Worker:MaxConcurrentJobs"] ?? "1")
 };
 
-// RabbitMQ configuration
-var rabbitMQHost = configuration["RabbitMQ:Host"] ?? "localhost";
-var rabbitMQPort = int.Parse(configuration["RabbitMQ:Port"] ?? "5672");
+// RabbitMQ configuration with environment variable support
+var rabbitMQHost = Environment.GetEnvironmentVariable("RABBITMQ_HOST") 
+    ?? configuration["RabbitMQ:Host"] 
+    ?? "localhost";
+var rabbitMQPort = int.Parse(Environment.GetEnvironmentVariable("RABBITMQ_PORT") 
+    ?? configuration["RabbitMQ:Port"] 
+    ?? "5672");
 
 // API configuration
 var apiBaseUrl = configuration["Api:BaseUrl"] ?? "http://localhost:7000";
@@ -42,6 +49,7 @@ Console.WriteLine();
 Console.WriteLine($"Worker ID:       {workerConfig.WorkerId}");
 Console.WriteLine($"Worker Name:     {workerConfig.WorkerName}");
 Console.WriteLine($"Tenant ID:       {workerConfig.TenantId}");
+Console.WriteLine($"API Key:         {workerConfig.ApiKey.Substring(0, Math.Min(8, workerConfig.ApiKey.Length))}...");
 Console.WriteLine($"Tags:            [{string.Join(", ", workerConfig.Tags)}]");
 Console.WriteLine($"Database Types:  [{string.Join(", ", workerConfig.SupportedDatabaseTypes)}]");
 Console.WriteLine($"Max Jobs:        {workerConfig.MaxConcurrentJobs}");

@@ -151,7 +151,8 @@ public class ApiClient : IApiClient
         string[] supportedDatabaseTypes,
         int maxConcurrentJobs,
         string? version,
-        string[] tags)
+        string[] tags,
+        Guid? existingWorkerId = null)
     {
         _logger.LogInformation("Registering worker {WorkerName} with API at {BaseUrl}", name, _httpClient.BaseAddress);
         _logger.LogInformation("API Key: {ApiKey}", _apiKey.Substring(0, Math.Min(8, _apiKey.Length)) + "...");
@@ -160,6 +161,7 @@ public class ApiClient : IApiClient
         {
             var request = new
             {
+                WorkerId = existingWorkerId, // Optional: for re-registration with same ID
                 Name = name,
                 Hostname = hostname,
                 OsInfo = osInfo,

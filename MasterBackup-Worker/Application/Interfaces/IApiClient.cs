@@ -30,7 +30,8 @@ public interface IApiClient
         string[] supportedDatabaseTypes,
         int maxConcurrentJobs,
         string? version,
-        string[] tags);
+        string[] tags,
+        Guid? existingWorkerId = null);
     
     /// <summary>
     /// Sends a heartbeat to the API

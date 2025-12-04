@@ -1,3 +1,4 @@
+using MasterBackup_API.Application.Common.DTOs;
 using MasterBackup_API.Application.Common.Interfaces;
 using MasterBackup_API.Domain.Models;
 using RabbitMQ.Client;
@@ -14,7 +15,8 @@ public class RabbitMQService : IMessageQueueService, IDisposable
 {
     private readonly IConnectionFactory _factory;
     private readonly ILogger<RabbitMQService> _logger;
-    private readonly string _exchangeName = "masterbackup.exchange";
+    private readonly string _exchangeName = "masterbackup.jobs"; // Unified exchange
+    private readonly string _exchangeType = "topic"; // Topic exchange for routing keys
     private IConnection? _connection;
     private IChannel? _channel;
     private bool _disposed;
@@ -52,20 +54,20 @@ public class RabbitMQService : IMessageQueueService, IDisposable
         {
             _channel = await _connection.CreateChannelAsync();
             
-            // Declare main exchange
+            // Declare unified topic exchange for all job types
             await _channel.ExchangeDeclareAsync(
                 exchange: _exchangeName,
-                type: ExchangeType.Topic,
+                type: _exchangeType,
                 durable: true,
                 autoDelete: false
             );
             
-            _logger.LogInformation("RabbitMQ channel created and exchange declared");
+            _logger.LogInformation("RabbitMQ channel created and topic exchange '{ExchangeName}' declared", _exchangeName);
         }
     }
 
     /// <summary>
-    /// Publish a backup job message to the tenant's backup queue
+    /// Publish a backup job message to the tenant's unified queue with routing key
     /// </summary>
     public async Task PublishBackupJobAsync(Guid tenantId, BackupJobMessage message)
     {
@@ -73,7 +75,8 @@ public class RabbitMQService : IMessageQueueService, IDisposable
         {
             await EnsureConnectionAsync();
 
-            var routingKey = $"backup.job.{tenantId}";
+            // Routing key pattern: backup.execute.{tenantId}
+            var routingKey = $"backup.execute.{tenantId}";
             var json = JsonSerializer.Serialize(message);
             var body = Encoding.UTF8.GetBytes(json);
 
@@ -85,9 +88,11 @@ public class RabbitMQService : IMessageQueueService, IDisposable
                 Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
                 Headers = new Dictionary<string, object?>
                 {
+                    { "message-type", "BackupJob" },
                     { "tenant-id", tenantId.ToString() },
                     { "backup-schedule-id", message.BackupScheduleId.ToString() },
-                    { "retry-count", message.CurrentRetry }
+                    { "retry-count", message.CurrentRetry },
+                    { "published-at", DateTime.UtcNow.ToString("O") }
                 }
             };
 
@@ -113,34 +118,18 @@ public class RabbitMQService : IMessageQueueService, IDisposable
     }
 
     /// <summary>
-    /// Publish a test connection message to the tenant's test-connection queue
+    /// Publish a test connection message to the tenant's unified queue with routing key
     /// </summary>
-    public async Task PublishTestConnectionAsync(Guid tenantId, object message)
+    public async Task PublishTestConnectionAsync(Guid tenantId, TestConnectionMessage message)
     {
         try
         {
             await EnsureConnectionAsync();
 
-            var queueName = $"{tenantId}.test-connection.queue";
-            var routingKey = $"test-connection.{tenantId}";
+            // Routing key pattern: backup.test.{tenantId}
+            var routingKey = $"backup.test.{tenantId}";
             var json = JsonSerializer.Serialize(message);
             var body = Encoding.UTF8.GetBytes(json);
-
-            // Declare the test-connection queue if it doesn't exist
-            await _channel!.QueueDeclareAsync(
-                queue: queueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: null
-            );
-
-            // Bind queue to exchange
-            await _channel.QueueBindAsync(
-                queue: queueName,
-                exchange: _exchangeName,
-                routingKey: routingKey
-            );
 
             var properties = new BasicProperties
             {
@@ -150,12 +139,14 @@ public class RabbitMQService : IMessageQueueService, IDisposable
                 Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
                 Headers = new Dictionary<string, object?>
                 {
+                    { "message-type", "TestConnection" },
                     { "tenant-id", tenantId.ToString() },
-                    { "message-type", "TestConnection" }
+                    { "connection-id", message.ConnectionId.ToString() },
+                    { "published-at", DateTime.UtcNow.ToString("O") }
                 }
             };
 
-            await _channel.BasicPublishAsync(
+            await _channel!.BasicPublishAsync(
                 exchange: _exchangeName,
                 routingKey: routingKey,
                 mandatory: true,
@@ -164,19 +155,30 @@ public class RabbitMQService : IMessageQueueService, IDisposable
             );
 
             _logger.LogInformation(
-                "Test connection message published for tenant {TenantId} to queue {QueueName}",
-                tenantId, queueName
-            );
+                "✅ Test connection message published successfully");
+            _logger.LogInformation(
+                "   Exchange: {Exchange}", _exchangeName);
+            _logger.LogInformation(
+                "   Routing Key: {RoutingKey}", routingKey);
+            _logger.LogInformation(
+                "   Connection ID: {ConnectionId}", message.ConnectionId);
+            _logger.LogInformation(
+                "   Tenant ID: {TenantId}", tenantId);
+            _logger.LogInformation(
+                "   Database: {Type} @ {Host}:{Port}/{Database}", 
+                message.Type, message.Host, message.Port, message.Database);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error publishing test connection message for tenant {TenantId}", tenantId);
+            _logger.LogError(ex, 
+                "❌ Error publishing test connection message for tenant {TenantId}, connection {ConnectionId}", 
+                tenantId, message?.ConnectionId);
             throw;
         }
     }
 
     /// <summary>
-    /// Create exchange and queues for a tenant
+    /// Create unified queue for a tenant with wildcard routing pattern
     /// </summary>
     public async Task CreateTenantQueueAsync(Guid tenantId)
     {
@@ -184,69 +186,64 @@ public class RabbitMQService : IMessageQueueService, IDisposable
         {
             await EnsureConnectionAsync();
 
-            // Queue names
-            var backupQueueName = $"backup.jobs.{tenantId}";
-            var resultQueueName = $"backup.results.{tenantId}";
-            var dlqName = $"backup.jobs.{tenantId}.dlq";
+            // Unified queue name for all job types
+            var queueName = $"tenant.{tenantId}.jobs";
+            var dlqName = $"tenant.{tenantId}.jobs.dlq";
+            var routingPattern = $"backup.*.{tenantId}";
 
-            // Declare Dead Letter Queue
-            await _channel!.QueueDeclareAsync(
-                queue: dlqName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: null
-            );
-
-            // Declare backup jobs queue with DLQ
-            var queueArgs = new Dictionary<string, object?>
+            // Check if queue already exists
+            bool queueExists = false;
+            try
             {
-                { "x-dead-letter-exchange", _exchangeName },
-                { "x-dead-letter-routing-key", $"backup.dlq.{tenantId}" },
-                { "x-message-ttl", 3600000 } // 1 hour TTL
-            };
+                await _channel!.QueueDeclarePassiveAsync(queue: queueName);
+                queueExists = true;
+                _logger.LogDebug("Queue {QueueName} already exists", queueName);
+            }
+            catch
+            {
+                // Queue doesn't exist, we'll create it
+                _logger.LogDebug("Queue {QueueName} doesn't exist, creating...", queueName);
+            }
 
-            await _channel.QueueDeclareAsync(
-                queue: backupQueueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: queueArgs
-            );
+            if (!queueExists)
+            {
+                // Declare Dead Letter Queue
+                await _channel!.QueueDeclareAsync(
+                    queue: dlqName,
+                    durable: true,
+                    exclusive: false,
+                    autoDelete: false,
+                    arguments: null
+                );
 
-            // Bind backup queue to exchange
-            await _channel.QueueBindAsync(
-                queue: backupQueueName,
+                // Declare unified jobs queue WITHOUT x-message-ttl to match Worker's declaration
+                var queueArgs = new Dictionary<string, object?>
+                {
+                    { "x-dead-letter-exchange", "" }, // Default exchange
+                    { "x-dead-letter-routing-key", dlqName }
+                };
+
+                await _channel.QueueDeclareAsync(
+                    queue: queueName,
+                    durable: true,
+                    exclusive: false,
+                    autoDelete: false,
+                    arguments: queueArgs
+                );
+
+                _logger.LogInformation("Created unified queue: {QueueName} with DLQ: {DLQ}", queueName, dlqName);
+            }
+
+            // Always ensure binding exists (this is idempotent)
+            await _channel!.QueueBindAsync(
+                queue: queueName,
                 exchange: _exchangeName,
-                routingKey: $"backup.job.{tenantId}"
-            );
-
-            // Bind DLQ to exchange
-            await _channel.QueueBindAsync(
-                queue: dlqName,
-                exchange: _exchangeName,
-                routingKey: $"backup.dlq.{tenantId}"
-            );
-
-            // Declare results queue
-            await _channel.QueueDeclareAsync(
-                queue: resultQueueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false,
-                arguments: null
-            );
-
-            // Bind results queue
-            await _channel.QueueBindAsync(
-                queue: resultQueueName,
-                exchange: _exchangeName,
-                routingKey: $"backup.result.{tenantId}"
+                routingKey: routingPattern
             );
 
             _logger.LogInformation(
-                "Created queues for tenant {TenantId}: {BackupQueue}, {ResultQueue}, {DLQ}",
-                tenantId, backupQueueName, resultQueueName, dlqName
+                "Ensured queue binding for tenant {TenantId}: {QueueName} -> {Exchange} with pattern: {Pattern}",
+                tenantId, queueName, _exchangeName, routingPattern
             );
         }
         catch (Exception ex)
@@ -256,86 +253,9 @@ public class RabbitMQService : IMessageQueueService, IDisposable
         }
     }
 
-    /// <summary>
-    /// Delete tenant queues and unbind from exchange
-    /// </summary>
-    public async Task DeleteTenantQueueAsync(Guid tenantId)
-    {
-        try
-        {
-            await EnsureConnectionAsync();
 
-            var backupQueueName = $"backup.jobs.{tenantId}";
-            var resultQueueName = $"backup.results.{tenantId}";
-            var dlqName = $"backup.jobs.{tenantId}.dlq";
 
-            // Delete queues (this also unbinds them)
-            await _channel!.QueueDeleteAsync(queue: backupQueueName, ifUnused: false, ifEmpty: false);
-            await _channel.QueueDeleteAsync(queue: resultQueueName, ifUnused: false, ifEmpty: false);
-            await _channel.QueueDeleteAsync(queue: dlqName, ifUnused: false, ifEmpty: false);
 
-            _logger.LogInformation("Deleted queues for tenant {TenantId}", tenantId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting queues for tenant {TenantId}", tenantId);
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Subscribe to backup result messages from workers
-    /// </summary>
-    public async Task SubscribeToBackupResultsAsync(Guid tenantId, Func<BackupJobResult, Task> onMessageReceived)
-    {
-        try
-        {
-            await EnsureConnectionAsync();
-
-            var resultQueueName = $"backup.results.{tenantId}";
-
-            var consumer = new AsyncEventingBasicConsumer(_channel!);
-            consumer.ReceivedAsync += async (model, ea) =>
-            {
-                try
-                {
-                    var body = ea.Body.ToArray();
-                    var json = Encoding.UTF8.GetString(body);
-                    var result = JsonSerializer.Deserialize<BackupJobResult>(json);
-
-                    if (result != null)
-                    {
-                        await onMessageReceived(result);
-                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                        
-                        _logger.LogInformation(
-                            "Processed backup result {JobId} for tenant {TenantId}, Success: {Success}",
-                            result.JobId, tenantId, result.Success
-                        );
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error processing backup result message");
-                    // Reject and requeue the message
-                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
-                }
-            };
-
-            await _channel.BasicConsumeAsync(
-                queue: resultQueueName,
-                autoAck: false,
-                consumer: consumer
-            );
-
-            _logger.LogInformation("Subscribed to backup results for tenant {TenantId}", tenantId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error subscribing to backup results for tenant {TenantId}", tenantId);
-            throw;
-        }
-    }
 
     /// <summary>
     /// Check if RabbitMQ connection is healthy
@@ -355,7 +275,7 @@ public class RabbitMQService : IMessageQueueService, IDisposable
     }
 
     /// <summary>
-    /// Get queue statistics
+    /// Get unified queue statistics for a tenant
     /// </summary>
     public async Task<QueueStats> GetQueueStatsAsync(Guid tenantId)
     {
@@ -363,7 +283,8 @@ public class RabbitMQService : IMessageQueueService, IDisposable
         {
             await EnsureConnectionAsync();
 
-            var queueName = $"backup.jobs.{tenantId}";
+            // Unified queue name
+            var queueName = $"tenant.{tenantId}.jobs";
             var queueDeclareOk = await _channel!.QueueDeclarePassiveAsync(queue: queueName);
 
             return new QueueStats

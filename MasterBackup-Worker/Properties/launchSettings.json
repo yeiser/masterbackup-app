@@ -1,11 +1,40 @@
 {
   "profiles": {
     "MasterBackup-Worker": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "Worker__TenantId": "ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b",
+        "RABBITMQ_HOST": "localhost",
+        "RABBITMQ_PORT": "5672",
+        "RABBITMQ_USER": "guest",
+        "RABBITMQ_PASSWORD": "guest",
+        "RABBITMQ_VHOST": "/",
+        "AZURE_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
+        "DatabaseTools__PostgreSQL__PgDumpPath": "C:\\Program Files\\PostgreSQL\\16\\bin\\pg_dump.exe",
+        "DatabaseTools__PostgreSQL__PgRestorePath": "C:\\Program Files\\PostgreSQL\\16\\bin\\pg_restore.exe"
+      },
+      "dotnetRunMessages": true
     },
-    "WSL": {
-      "commandName": "WSL2",
-      "distributionName": ""
+    "Docker": {
+      "commandName": "Docker",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Worker__TenantId": "ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b",
+        "Worker__WorkerId": "103f1984-88f8-4ceb-a464-ae3e9517bf2f",
+        "Worker__WorkerName": "Worker-Docker-Debug",
+        "Worker__ApiKey": "mb_uJ2UKAAA",
+        "Api__BaseUrl": "http://host.docker.internal:7000",
+        "RABBITMQ_HOST": "host.docker.internal",
+        "RABBITMQ_PORT": "5672",
+        "RABBITMQ_USER": "guest",
+        "RABBITMQ_PASSWORD": "guest",
+        "RABBITMQ_VHOST": "/",
+        "AZURE_STORAGE_CONNECTION_STRING": "UseDevelopmentStorage=true",
+        "DatabaseTools__PostgreSQL__PgDumpPath": "/usr/bin/pg_dump",
+        "DatabaseTools__PostgreSQL__PgRestorePath": "/usr/bin/pg_restore",
+        "DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2UNENCRYPTEDSUPPORT": "true"
+      }
     }
   }
 }

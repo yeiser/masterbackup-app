@@ -1,3 +1,4 @@
+using MasterBackup_API.Application.Common.DTOs;
 using MasterBackup_API.Domain.Models;
 
 namespace MasterBackup_API.Application.Common.Interfaces;
@@ -13,24 +14,14 @@ public interface IMessageQueueService
     Task PublishBackupJobAsync(Guid tenantId, BackupJobMessage message);
     
     /// <summary>
-    /// Publish a test connection message to the tenant's test-connection queue
+    /// Publish a test connection message to the tenant's unified queue with routing key
     /// </summary>
-    Task PublishTestConnectionAsync(Guid tenantId, object message);
+    Task PublishTestConnectionAsync(Guid tenantId, TestConnectionMessage message);
     
     /// <summary>
     /// Create exchange and queues for a new tenant
     /// </summary>
     Task CreateTenantQueueAsync(Guid tenantId);
-    
-    /// <summary>
-    /// Delete tenant queues and unbind from exchange
-    /// </summary>
-    Task DeleteTenantQueueAsync(Guid tenantId);
-    
-    /// <summary>
-    /// Subscribe to backup result messages from workers
-    /// </summary>
-    Task SubscribeToBackupResultsAsync(Guid tenantId, Func<BackupJobResult, Task> onMessageReceived);
     
     /// <summary>
     /// Check if RabbitMQ connection is healthy

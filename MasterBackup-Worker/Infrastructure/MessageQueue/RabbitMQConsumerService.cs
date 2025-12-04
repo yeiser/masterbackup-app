@@ -22,7 +22,7 @@ public class RabbitMQConsumerService : BackgroundService
     private readonly WorkerConfiguration _workerConfig;
     private IConnection? _connection;
     private IModel? _channel;
-    private string? _queueName;
+    private string? _unifiedQueueName;
     private readonly string _rabbitMQHost;
     private readonly int _rabbitMQPort;
 
@@ -65,11 +65,12 @@ public class RabbitMQConsumerService : BackgroundService
         
         _logger.LogInformation("Worker registered with ID: {WorkerId}. Initializing RabbitMQ connection...", _workerConfig.WorkerId);
         
-        // NOW we can determine the queue name with the correct TenantId
-        // Listen to backup jobs queue
-        _queueName = $"backup.jobs.{_workerConfig.TenantId}";
+        // Unified queue name for all job types
+        _unifiedQueueName = $"tenant.{_workerConfig.TenantId}.jobs";
         
-        _logger.LogInformation("Worker will consume from queue: {QueueName}", _queueName);
+        _logger.LogInformation("Worker will consume from UNIFIED queue:");
+        _logger.LogInformation("  Queue: {UnifiedQueue}", _unifiedQueueName);
+        _logger.LogInformation("  Handles: Backup Jobs, Test Connections, and all future job types");
         
         // Initialize RabbitMQ connection
         var factory = new ConnectionFactory
@@ -85,9 +86,9 @@ public class RabbitMQConsumerService : BackgroundService
         _connection = factory.CreateConnection();
         _channel = _connection.CreateModel();
         
-        // Declare queue (idempotent)
+        // Declare unified queue (idempotent)
         _channel.QueueDeclare(
-            queue: _queueName,
+            queue: _unifiedQueueName,
             durable: true,
             exclusive: false,
             autoDelete: false,
@@ -99,70 +100,31 @@ public class RabbitMQConsumerService : BackgroundService
         _logger.LogInformation("═══════════════════════════════════════════════════════════");
         _logger.LogInformation("RabbitMQ Consumer Initialized Successfully");
         _logger.LogInformation("═══════════════════════════════════════════════════════════");
-        _logger.LogInformation("Queue Name:  {QueueName}", _queueName);
+        _logger.LogInformation("Unified Queue:  {UnifiedQueue}", _unifiedQueueName);
         _logger.LogInformation("Host:        {Host}:{Port}", _rabbitMQHost, _rabbitMQPort);
         _logger.LogInformation("Tenant ID:   {TenantId}", _workerConfig.TenantId);
         _logger.LogInformation("Worker ID:   {WorkerId}", _workerConfig.WorkerId);
         _logger.LogInformation("Max Jobs:    {MaxJobs}", _workerConfig.MaxConcurrentJobs);
         _logger.LogInformation("═══════════════════════════════════════════════════════════");
         
+        // Single consumer for unified queue
         var consumer = new EventingBasicConsumer(_channel);
-        
         consumer.Received += async (model, ea) =>
         {
-            try
-            {
-                var body = ea.Body.ToArray();
-                var messageJson = Encoding.UTF8.GetString(body);
-                
-                _logger.LogInformation("╔═══════════════════════════════════════════════════════════╗");
-                _logger.LogInformation("║  📩 NEW MESSAGE RECEIVED from queue {QueueName}", _queueName);
-                _logger.LogInformation("╚═══════════════════════════════════════════════════════════╝");
-                _logger.LogInformation("Message Content: {Message}", messageJson);
-
-                // Determine message type and process accordingly
-                var messageType = DetermineMessageType(messageJson);
-                _logger.LogInformation("Message type determined: {MessageType}", messageType);
-                
-                var processed = messageType switch
-                {
-                    "TestConnection" => await ProcessTestConnectionMessageAsync(messageJson),
-                    "BackupJob" => await ProcessBackupJobMessageAsync(messageJson),
-                    _ => false
-                };
-                
-                _logger.LogInformation("Message processed: {Processed}", processed);
-
-                if (processed)
-                {
-                    _channel?.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
-                    _logger.LogInformation("Message acknowledged successfully");
-                }
-                else
-                {
-                    // Reject and requeue if not processed (another worker might be able to handle it)
-                    _channel?.BasicNack(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true);
-                    _logger.LogWarning("Message not processed, requeued for another worker");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing message from queue {QueueName}", _queueName);
-                
-                // Don't requeue on exception to avoid infinite loops
-                _channel?.BasicNack(deliveryTag: ea.DeliveryTag, multiple: false, requeue: false);
-            }
+            await ProcessMessageAsync(ea, _channel, _unifiedQueueName!);
         };
 
+        // Start consuming from unified queue
         _channel?.BasicConsume(
-            queue: _queueName,
+            queue: _unifiedQueueName,
             autoAck: false,
             consumer: consumer);
 
         _logger.LogInformation("╔═══════════════════════════════════════════════════════════╗");
-        _logger.LogInformation("║  ✓ RabbitMQ Consumer ACTIVE - Listening for messages     ║");
+        _logger.LogInformation("║  ✓ RabbitMQ Consumer ACTIVE - Listening for ALL messages ║");
         _logger.LogInformation("╚═══════════════════════════════════════════════════════════╝");
-        _logger.LogInformation("Waiting for messages on queue: {QueueName}...", _queueName);
+        _logger.LogInformation("Unified Queue: {UnifiedQueue}", _unifiedQueueName);
+        _logger.LogInformation("Message Types: BackupJob, TestConnection, and future types");
 
         // Keep the service running until cancellation is requested
         try
@@ -177,6 +139,66 @@ public class RabbitMQConsumerService : BackgroundService
         {
             _channel?.Close();
             _connection?.Close();
+        }
+    }
+
+    private async Task ProcessMessageAsync(BasicDeliverEventArgs ea, IModel channel, string queueName)
+    {
+        try
+        {
+            var body = ea.Body.ToArray();
+            var messageJson = Encoding.UTF8.GetString(body);
+            var routingKey = ea.RoutingKey;
+            
+            _logger.LogInformation("╔═══════════════════════════════════════════════════════════╗");
+            _logger.LogInformation("║  📩 NEW MESSAGE RECEIVED                                  ║");
+            _logger.LogInformation("╚═══════════════════════════════════════════════════════════╝");
+            _logger.LogInformation("Queue:       {QueueName}", queueName);
+            _logger.LogInformation("Routing Key: {RoutingKey}", routingKey);
+            
+            // Extract message type from headers (priority) or routing key (fallback)
+            string messageType;
+            if (ea.BasicProperties?.Headers != null && 
+                ea.BasicProperties.Headers.TryGetValue("message-type", out var headerValue))
+            {
+                messageType = Encoding.UTF8.GetString((byte[])headerValue);
+                _logger.LogInformation("Message Type: {MessageType} (from header)", messageType);
+            }
+            else
+            {
+                messageType = DetermineMessageTypeFromRoutingKey(routingKey);
+                _logger.LogInformation("Message Type: {MessageType} (from routing key)", messageType);
+            }
+            
+            _logger.LogDebug("Message Content: {Message}", 
+                messageJson.Length > 500 ? messageJson.Substring(0, 500) + "..." : messageJson);
+
+            // Process based on message type
+            var processed = messageType switch
+            {
+                "TestConnection" => await ProcessTestConnectionMessageAsync(messageJson),
+                "BackupJob" => await ProcessBackupJobMessageAsync(messageJson),
+                _ => false
+            };
+            
+            if (processed)
+            {
+                channel?.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
+                _logger.LogInformation("✓ Message acknowledged successfully (Type: {MessageType})", messageType);
+            }
+            else
+            {
+                // Reject and requeue if not processed (another worker might be able to handle it)
+                channel?.BasicNack(deliveryTag: ea.DeliveryTag, multiple: false, requeue: true);
+                _logger.LogWarning("⚠ Message not processed, requeued for another worker");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Error processing message from queue {QueueName}", queueName);
+            
+            // Don't requeue on exception to avoid infinite loops
+            channel?.BasicNack(deliveryTag: ea.DeliveryTag, multiple: false, requeue: false);
         }
     }
 
@@ -272,26 +294,27 @@ public class RabbitMQConsumerService : BackgroundService
         }
     }
 
-    private string DetermineMessageType(string messageJson)
+    private string DetermineMessageTypeFromRoutingKey(string routingKey)
     {
-        _logger.LogDebug("Determining message type for: {Message}", messageJson);
+        _logger.LogDebug("Determining message type from routing key: {RoutingKey}", routingKey);
         
-        // Simple heuristic: check if message contains JobId and DatabaseConnection (BackupJob)
-        // or ConnectionId (TestConnection)
-        if (messageJson.Contains("\"JobId\"", StringComparison.OrdinalIgnoreCase) && 
-            messageJson.Contains("\"DatabaseConnection\"", StringComparison.OrdinalIgnoreCase))
+        // Routing key patterns:
+        // - backup.execute.{tenantId} -> BackupJob
+        // - backup.test.{tenantId} -> TestConnection
+        
+        if (routingKey.Contains(".execute.", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogDebug("Message identified as BackupJob (contains JobId and DatabaseConnection)");
+            _logger.LogDebug("Message identified as BackupJob (routing key contains .execute.)");
             return "BackupJob";
         }
         
-        if (messageJson.Contains("\"ConnectionId\"", StringComparison.OrdinalIgnoreCase))
+        if (routingKey.Contains(".test.", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogDebug("Message identified as TestConnection (contains ConnectionId)");
+            _logger.LogDebug("Message identified as TestConnection (routing key contains .test.)");
             return "TestConnection";
         }
 
-        _logger.LogWarning("Unknown message type. Message does not contain expected fields for BackupJob or TestConnection");
+        _logger.LogWarning("Unknown message type. Routing key does not match expected patterns: {RoutingKey}", routingKey);
         return "Unknown";
     }
 

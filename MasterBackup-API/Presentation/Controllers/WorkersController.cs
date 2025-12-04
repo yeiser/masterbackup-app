@@ -35,6 +35,7 @@ public class WorkersController : ControllerBase
         {
             var command = new RegisterWorkerCommand
             {
+                WorkerId = dto.WorkerId,
                 Name = dto.Name,
                 Description = dto.Description,
                 Hostname = dto.Hostname,

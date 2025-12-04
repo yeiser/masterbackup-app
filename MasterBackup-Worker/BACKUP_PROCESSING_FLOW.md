@@ -11,9 +11,14 @@ The Worker is now configured to consume backup job messages from RabbitMQ and ex
 **File:** `Infrastructure/MessageQueue/RabbitMQConsumerService.cs`
 
 #### Queue Configuration
-- Changed from test-connection queue to backup jobs queue
-- Queue name: `backup.jobs.{tenantId}`
-- Example: `backup.jobs.ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b`
+- **Dual Queue Consumption**: Worker now listens to BOTH queues simultaneously
+  - Backup Jobs Queue: `backup.jobs.{tenantId}`
+  - Test Connection Queue: `{tenantId}.test-connection.queue`
+- Example queues:
+  - `backup.jobs.ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b`
+  - `ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b.test-connection.queue`
+- Uses separate channels for each queue for better isolation
+- Independent prefetch count per queue
 
 #### Message Type Detection
 Updated `DetermineMessageType()` method to properly identify BackupJob messages:
@@ -250,12 +255,20 @@ Expected output:
 ║          MasterBackup Worker - Starting Up                   ║
 ╚══════════════════════════════════════════════════════════════╝
 
-Worker will consume from queue: backup.jobs.{tenantId}
+Worker will consume from queues:
+  - Backup Jobs:      backup.jobs.ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b
+  - Test Connection:  ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b.test-connection.queue
+
 RabbitMQ Consumer Initialized Successfully
-Queue Name:  backup.jobs.ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b
+Backup Jobs Queue:      backup.jobs.ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b
+Test Connection Queue:  ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b.test-connection.queue
 Tenant ID:   ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b
 Worker ID:   550e8400-e29b-41d4-a716-446655440000
-✓ RabbitMQ Consumer ACTIVE - Listening for messages
+
+✓ RabbitMQ Consumers ACTIVE - Listening for messages
+Waiting for messages on:
+  - backup.jobs.ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b
+  - ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b.test-connection.queue
 ```
 
 ### 2. Trigger Instant Backup from Frontend
@@ -264,8 +277,13 @@ Worker ID:   550e8400-e29b-41d4-a716-446655440000
 - Confirm execution
 
 ### 3. Watch Worker Logs
+
+**For Backup Job:**
 ```
-📩 NEW MESSAGE RECEIVED from queue backup.jobs.{tenantId}
+╔═══════════════════════════════════════════════════════════╗
+║  📩 NEW MESSAGE from BackupJobs queue
+╚═══════════════════════════════════════════════════════════╝
+Queue: backup.jobs.ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b
 Message type determined: BackupJob
 Processing backup job {JobId} on worker {WorkerId}
 Starting backup execution for Job {JobId}, Database: {DatabaseName}
@@ -274,7 +292,19 @@ Database dump completed. Size: 2.5 MB
 Backup compressed. Original: 2.5 MB, Compressed: 0.8 MB
 Backup uploaded to blob storage: https://...
 Backup Job {JobId} completed successfully in 00:00:45
-Message acknowledged successfully
+✓ Message acknowledged successfully from BackupJobs
+```
+
+**For Test Connection:**
+```
+╔═══════════════════════════════════════════════════════════╗
+║  📩 NEW MESSAGE from TestConnection queue
+╚═══════════════════════════════════════════════════════════╝
+Queue: ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b.test-connection.queue
+Message type determined: TestConnection
+Processing test connection for {ConnectionId}
+Test connection {ConnectionId} completed: SUCCESS
+✓ Message acknowledged successfully from TestConnection
 ```
 
 ### 4. Verify in API Logs

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  worker:
+    image: ${DOCKER_REGISTRY-}masterbackup-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: masterbackup-worker-debug
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTPS_PORTS=8081
+      - Worker__TenantId=ffa0a003-0206-433b-b0fd-0a2ef0ae0f2b
+      - Worker__WorkerId=103f1984-88f8-4ceb-a464-ae3e9517bf2f
+      - Worker__WorkerName=Worker-Docker-Debug
+      - Worker__ApiKey=mb_uJ2UKAAA
+      # Use localhost directly - Docker Desktop on Windows exposes host ports
+      - Api__BaseUrl=http://host.docker.internal:7000
+      - RABBITMQ_HOST=host.docker.internal
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_VHOST=/
+      - AZURE_STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true
+      - DatabaseTools__PostgreSQL__PgDumpPath=/usr/bin/pg_dump
+      - DatabaseTools__PostgreSQL__PgRestorePath=/usr/bin/pg_restore
+      # Disable SSL verification for development (host.docker.internal certificate issues)
+      - DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2UNENCRYPTEDSUPPORT=true
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+    volumes:
+      - ./backups:/app/backups
+      - ~/.vsdbg:/remote_debugger:rw
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    network_mode: "bridge"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

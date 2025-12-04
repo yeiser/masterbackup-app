@@ -221,6 +221,7 @@ builder.Services.AddQuartzHostedService(options =>
 
 // Add Background Services
 builder.Services.AddHostedService<LogCleanupService>();
+builder.Services.AddHostedService<BackupScheduleInitializerService>();
 
 // Add Controllers
 builder.Services.AddControllers();

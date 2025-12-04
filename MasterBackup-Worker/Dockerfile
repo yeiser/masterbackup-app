@@ -1,52 +1,42 @@
-# Stage 1: Build
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
+#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-# Copy csproj and restore dependencies
-COPY ["MasterBackup-Worker.csproj", "./"]
-RUN dotnet restore "MasterBackup-Worker.csproj"
-
-# Copy source code and build
-COPY . .
-RUN dotnet build "MasterBackup-Worker.csproj" -c Release -o /app/build
-RUN dotnet publish "MasterBackup-Worker.csproj" -c Release -o /app/publish
-
-# Stage 2: Runtime
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
+USER root
 WORKDIR /app
 
-# Install PostgreSQL client tools (includes pg_dump, pg_restore, and other utilities)
-# Also install common compression tools
+# Install PostgreSQL client tools
 RUN apt-get update && \
-    apt-get install -y \
-    postgresql-client \
-    gzip \
-    bzip2 \
-    xz-utils \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get install -y postgresql-client && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Verify PostgreSQL tools are installed
-RUN pg_dump --version && pg_restore --version
+# Create backup directories
+RUN mkdir -p /app/backups/temp && chmod -R 755 /app/backups
 
-# Copy published app
-COPY --from=build /app/publish .
+# Verify pg_dump installation
+RUN pg_dump --version
 
-# Copy appsettings (will be overridden by environment variables)
-COPY appsettings.json .
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src
 
-# Create directory for temporary backup files
-RUN mkdir -p /app/backups && chmod 777 /app/backups
+COPY ["MasterBackup-Worker.csproj", "."]
+RUN dotnet restore "./MasterBackup-Worker.csproj"
 
-# Set environment variables (these should be overridden at runtime)
-ENV DOTNET_ENVIRONMENT=Production
-ENV Worker__WorkerId=""
-ENV Worker__TenantId=""
-ENV Worker__ApiKey=""
-ENV BACKUP_TEMP_PATH="/app/backups"
+COPY . .
+WORKDIR "/src/."
+RUN dotnet build "./MasterBackup-Worker.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# Run as non-root user for security (optional but recommended)
-# RUN useradd -m -u 1000 workeruser && chown -R workeruser:workeruser /app
-# USER workeruser
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "./MasterBackup-Worker.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+
+# Environment variables (can be overridden in docker-compose or launchSettings)
+ENV ASPNETCORE_ENVIRONMENT=Development
+ENV PATH="${PATH}:/usr/bin"
 
 ENTRYPOINT ["dotnet", "MasterBackup-Worker.dll"]

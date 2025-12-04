@@ -31,12 +31,25 @@ public class BackupJob : IJob
     /// </summary>
     public async Task Execute(IJobExecutionContext context)
     {
-        // Obtener datos del job desde el JobDataMap
+        // Obtener datos del job desde el JobDataMap (almacenados como string)
         var dataMap = context.JobDetail.JobDataMap;
-        var backupScheduleId = dataMap.GetGuid("BackupScheduleId");
-        var databaseConnectionId = dataMap.GetGuid("DatabaseConnectionId");
-        var tenantId = dataMap.GetGuid("TenantId");
+        var backupScheduleIdString = dataMap.GetString("BackupScheduleId");
+        var databaseConnectionIdString = dataMap.GetString("DatabaseConnectionId");
+        var tenantIdString = dataMap.GetString("TenantId");
         var cronExpression = dataMap.GetString("CronExpression");
+
+        if (string.IsNullOrEmpty(backupScheduleIdString) || 
+            string.IsNullOrEmpty(databaseConnectionIdString) ||
+            string.IsNullOrEmpty(tenantIdString))
+        {
+            _logger.LogError("BackupJob executed with missing parameters. BackupScheduleId: {BackupScheduleId}, DatabaseConnectionId: {DatabaseConnectionId}, TenantId: {TenantId}",
+                backupScheduleIdString, databaseConnectionIdString, tenantIdString);
+            return;
+        }
+
+        var backupScheduleId = Guid.Parse(backupScheduleIdString);
+        var databaseConnectionId = Guid.Parse(databaseConnectionIdString);
+        var tenantId = Guid.Parse(tenantIdString);
 
         _logger.LogInformation(
             "Executing scheduled backup job. BackupScheduleId: {BackupScheduleId}, " +
@@ -48,12 +61,29 @@ public class BackupJob : IJob
         // Create a scope to resolve scoped services
         using var scope = _serviceProvider.CreateScope();
         var messageQueueService = scope.ServiceProvider.GetRequiredService<IMessageQueueService>();
-        var tenantDbContext = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        var masterDbContext = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
         var encryptionService = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
         try
         {
+            // Obtener la información del tenant desde MasterDbContext
+            var tenant = await masterDbContext.Tenants
+                .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+            if (tenant == null)
+            {
+                _logger.LogError("Tenant {TenantId} not found", tenantId);
+                return;
+            }
+
+            // Establecer el contexto del tenant
+            tenantContext.SetTenant(tenantId, tenant.ConnectionString);
+
+            // Ahora sí podemos obtener el TenantDbContext con el contexto correcto
+            var tenantDbContext = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
+
             // Get BackupSchedule and DatabaseConnection details
             var backupSchedule = await tenantDbContext.BackupSchedules
                 .Include(bs => bs.DatabaseConnection)
@@ -82,10 +112,30 @@ public class BackupJob : IJob
                 Password = decryptedPassword
             };
 
+            // Create BackupHistory record first
+            var jobId = Guid.NewGuid();
+            var backupHistory = new Domain.Entities.BackupHistory
+            {
+                Id = Guid.NewGuid(),
+                JobId = jobId,
+                BackupScheduleId = backupScheduleId,
+                DatabaseConnectionId = backupSchedule.DatabaseConnectionId,
+                Status = Domain.Enums.BackupStatus.Pending,
+                StartTime = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            tenantDbContext.BackupHistories.Add(backupHistory);
+            await tenantDbContext.SaveChangesAsync();
+
+            _logger.LogInformation("Created BackupHistory {BackupHistoryId} for Job {JobId}", 
+                backupHistory.Id, jobId);
+
             // Create backup job message
             var backupJobMessage = new BackupJobMessage
             {
-                JobId = Guid.NewGuid(),
+                JobId = jobId,
                 TenantId = tenantId,
                 BackupScheduleId = backupScheduleId,
                 DatabaseConnection = new DatabaseConnectionInfo
@@ -95,7 +145,9 @@ public class BackupJob : IJob
                     ConnectionString = connectionStringBuilder.ToString(),
                     DatabaseType = backupSchedule.DatabaseConnection.Type.ToString()
                 },
-                BlobStorageConnectionString = configuration["AzureStorage:ConnectionString"] ?? "UseDevelopmentStorage=true",
+                BlobStorageConnectionString = Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING") 
+                    ?? configuration["AzureStorage:ConnectionString"] 
+                    ?? throw new InvalidOperationException("Azure Storage connection string not configured"),
                 ContainerName = $"{configuration["AzureStorage:ContainerPrefix"] ?? "backups"}-{tenantId}",
                 BackupFileName = $"{backupSchedule.Name.Replace(" ", "-")}_{DateTime.UtcNow:yyyyMMdd-HHmmss}.backup",
                 TimeoutMinutes = backupSchedule.TimeoutMinutes,
@@ -129,14 +181,27 @@ public class BackupJob : IJob
             // Update LastExecutionStatus as Failed
             try
             {
-                var backupSchedule = await tenantDbContext.BackupSchedules
-                    .FirstOrDefaultAsync(bs => bs.Id == backupScheduleId);
+                // Obtener el tenant context y db context nuevamente en el catch
+                var tenantContextForError = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+                var masterDbContextForError = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
                 
-                if (backupSchedule != null)
+                var tenantForError = await masterDbContextForError.Tenants
+                    .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+                if (tenantForError != null)
                 {
-                    backupSchedule.LastRun = DateTime.UtcNow;
-                    // Store error information (could add LastError property to BackupSchedule entity)
-                    await tenantDbContext.SaveChangesAsync();
+                    tenantContextForError.SetTenant(tenantId, tenantForError.ConnectionString);
+                    var tenantDbContextForError = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
+                    
+                    var backupSchedule = await tenantDbContextForError.BackupSchedules
+                        .FirstOrDefaultAsync(bs => bs.Id == backupScheduleId);
+                    
+                    if (backupSchedule != null)
+                    {
+                        backupSchedule.LastRun = DateTime.UtcNow;
+                        // Store error information (could add LastError property to BackupSchedule entity)
+                        await tenantDbContextForError.SaveChangesAsync();
+                    }
                 }
             }
             catch (Exception dbEx)
@@ -147,17 +212,5 @@ public class BackupJob : IJob
             // Propagar la excepción para que Quartz.NET pueda manejar los reintentos
             throw;
         }
-    }
-}
-
-/// <summary>
-/// Extensiones helper para JobDataMap
-/// </summary>
-public static class JobDataMapExtensions
-{
-    public static Guid GetGuid(this JobDataMap dataMap, string key)
-    {
-        var value = dataMap.GetString(key);
-        return Guid.Parse(value ?? throw new ArgumentException($"Key '{key}' not found in JobDataMap"));
     }
 }

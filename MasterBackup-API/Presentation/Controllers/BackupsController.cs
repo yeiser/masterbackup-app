@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MasterBackup_API.Application.Common.Interfaces;
 using MasterBackup_API.Application.Features.Backups.Commands;
 using MasterBackup_API.Domain.Enums;
 using MasterBackup_API.Infrastructure.Middleware;
@@ -18,11 +19,13 @@ public class BackupsController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ILogger<BackupsController> _logger;
+    private readonly ITenantContext _tenantContext;
 
-    public BackupsController(IMediator mediator, ILogger<BackupsController> logger)
+    public BackupsController(IMediator mediator, ILogger<BackupsController> logger, ITenantContext tenantContext)
     {
         _mediator = mediator;
         _logger = logger;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
@@ -148,11 +151,19 @@ public class BackupsController : ControllerBase
     /// <summary>
     /// Update backup status from Worker (webhook endpoint)
     /// This endpoint is called by Workers to report backup progress and results
+    /// Workers authenticate via X-API-Key header (handled by TenantMiddleware)
     /// </summary>
     [HttpPost("update-status")]
-    [Authorize] // Worker must authenticate via JWT or API key
+    [AllowAnonymous] // Workers use API Key authentication via TenantMiddleware instead of JWT
     public async Task<IActionResult> UpdateBackupStatus([FromBody] UpdateBackupStatusRequest request)
     {
+        // Validate that tenant was resolved from API Key
+        if (!_tenantContext.TenantId.HasValue)
+        {
+            _logger.LogWarning("Backup status update rejected: No valid API Key provided");
+            return Unauthorized(new { Success = false, Error = "Invalid or missing API Key" });
+        }
+
         try
         {
             var command = new UpdateBackupStatusCommand

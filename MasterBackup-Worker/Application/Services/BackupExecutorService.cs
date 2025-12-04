@@ -14,14 +14,17 @@ public class BackupExecutorService : IBackupExecutorService
 {
     private readonly IBackupStatusReporter _statusReporter;
     private readonly ILogger<BackupExecutorService> _logger;
+    private readonly IConfiguration _configuration;
     private readonly string _tempPath;
 
     public BackupExecutorService(
         IBackupStatusReporter statusReporter,
-        ILogger<BackupExecutorService> logger)
+        ILogger<BackupExecutorService> logger,
+        IConfiguration configuration)
     {
         _statusReporter = statusReporter ?? throw new ArgumentNullException(nameof(statusReporter));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(logger));
         _tempPath = Path.Combine(Path.GetTempPath(), "masterbackup-worker");
         Directory.CreateDirectory(_tempPath);
     }
@@ -176,9 +179,14 @@ public class BackupExecutorService : IBackupExecutorService
         var username = connDict.GetValueOrDefault("Username", "");
         var password = connDict.GetValueOrDefault("Password", "");
 
+        // Get pg_dump path from configuration
+        var pgDumpPath = _configuration["DatabaseTools:PostgreSQL:PgDumpPath"] ?? "pg_dump";
+        
+        _logger.LogDebug("Using pg_dump from: {PgDumpPath}", pgDumpPath);
+
         var startInfo = new ProcessStartInfo
         {
-            FileName = "pg_dump",
+            FileName = pgDumpPath,
             Arguments = $"-h {host} -p {port} -U {username} -d {database} -F c -f \"{outputFile}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,

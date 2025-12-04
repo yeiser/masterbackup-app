@@ -80,6 +80,9 @@ public class WorkerRegistrationService : BackgroundService
                 var osInfo = $"{Environment.OSVersion.Platform} {Environment.OSVersion.Version}";
                 var version = "1.0.0"; // TODO: Get from assembly version
 
+                // Pass existing WorkerId if configured (for consistent development Worker IDs)
+                var existingWorkerId = _workerConfig.WorkerId != Guid.Empty ? _workerConfig.WorkerId : (Guid?)null;
+                
                 var (success, workerId, tenantId, message) = await _apiClient.RegisterWorkerAsync(
                     _workerConfig.WorkerName,
                     hostname,
@@ -87,7 +90,8 @@ public class WorkerRegistrationService : BackgroundService
                     _workerConfig.SupportedDatabaseTypes,
                     _workerConfig.MaxConcurrentJobs,
                     version,
-                    _workerConfig.Tags);
+                    _workerConfig.Tags,
+                    existingWorkerId);
 
                 if (success)
                 {

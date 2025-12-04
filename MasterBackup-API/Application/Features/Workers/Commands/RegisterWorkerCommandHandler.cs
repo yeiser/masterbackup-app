@@ -36,9 +36,21 @@ public class RegisterWorkerCommandHandler : IRequestHandler<RegisterWorkerComman
             throw new UnauthorizedAccessException("No se pudo identificar el tenant");
         }
 
-        // 2. Buscar si ya existe un worker con mismo nombre para este tenant
-        var existingWorker = await _masterContext.Workers
-            .FirstOrDefaultAsync(w => w.TenantId == tenantId.Value && w.Name == request.Name, cancellationToken);
+        // 2. Buscar si ya existe un worker (por ID si se proporciona, sino por nombre)
+        Worker? existingWorker = null;
+        if (request.WorkerId.HasValue && request.WorkerId.Value != Guid.Empty)
+        {
+            // Buscar por ID proporcionado (re-registration con mismo ID)
+            existingWorker = await _masterContext.Workers
+                .FirstOrDefaultAsync(w => w.Id == request.WorkerId.Value && w.TenantId == tenantId.Value, cancellationToken);
+        }
+        
+        if (existingWorker == null)
+        {
+            // Buscar por nombre si no se encontró por ID
+            existingWorker = await _masterContext.Workers
+                .FirstOrDefaultAsync(w => w.TenantId == tenantId.Value && w.Name == request.Name, cancellationToken);
+        }
         
         // 3. Obtener IP del cliente
         var ipAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
@@ -68,10 +80,10 @@ public class RegisterWorkerCommandHandler : IRequestHandler<RegisterWorkerComman
         }
         else
         {
-            // 4b. Crear nuevo Worker
+            // 4b. Crear nuevo Worker (usar ID proporcionado si existe, sino generar nuevo)
             worker = new Worker
             {
-                Id = Guid.NewGuid(),
+                Id = request.WorkerId ?? Guid.NewGuid(),
                 TenantId = tenantId.Value,
                 Name = request.Name,
                 Description = request.Description,

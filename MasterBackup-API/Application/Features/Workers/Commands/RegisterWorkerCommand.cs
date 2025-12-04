@@ -5,6 +5,7 @@ namespace MasterBackup_API.Application.Features.Workers.Commands;
 
 public class RegisterWorkerCommand : IRequest<RegisterWorkerResponseDto>
 {
+    public Guid? WorkerId { get; set; } // Optional: for re-registration with same ID
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? Hostname { get; set; }

@@ -2,6 +2,7 @@ namespace MasterBackup_API.Application.Common.DTOs;
 
 public class RegisterWorkerDto
 {
+    public Guid? WorkerId { get; set; } // Optional: for re-registration with same ID
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? Hostname { get; set; }
