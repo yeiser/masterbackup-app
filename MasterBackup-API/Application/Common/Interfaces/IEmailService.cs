@@ -8,4 +8,30 @@ public interface IEmailService
     Task SendPasswordResetEmailAsync(ApplicationUser user, string resetToken);
     Task SendInvitationEmailAsync(ApplicationUser user, string invitationToken, string inviterName);
     Task SendWelcomeEmailAsync(ApplicationUser user);
+    
+    // Backup Notifications
+    Task SendBackupCompletedEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string scheduleName,
+        string databaseName,
+        double fileSizeMB,
+        string blobUrl,
+        DateTime completedAt,
+        TimeSpan duration);
+    
+    Task SendBackupFailedEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string scheduleName,
+        string databaseName,
+        string errorMessage,
+        DateTime failedAt);
+    
+    Task SendBackupStartedEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string scheduleName,
+        string databaseName,
+        DateTime startedAt);
 }

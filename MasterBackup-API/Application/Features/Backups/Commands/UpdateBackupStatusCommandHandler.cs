@@ -11,16 +11,22 @@ namespace MasterBackup_API.Application.Features.Backups.Commands;
 public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStatusCommand, UpdateBackupStatusResult>
 {
     private readonly TenantDbContext _tenantContext;
+    private readonly MasterDbContext _masterContext;
     private readonly INotificationService _notificationService;
+    private readonly IEmailService _emailService;
     private readonly ILogger<UpdateBackupStatusCommandHandler> _logger;
 
     public UpdateBackupStatusCommandHandler(
         TenantDbContext tenantContext,
+        MasterDbContext masterContext,
         INotificationService notificationService,
+        IEmailService emailService,
         ILogger<UpdateBackupStatusCommandHandler> logger)
     {
         _tenantContext = tenantContext;
+        _masterContext = masterContext;
         _notificationService = notificationService;
+        _emailService = emailService;
         _logger = logger;
     }
 
@@ -179,6 +185,9 @@ public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStat
         {
             _logger.LogWarning(ex, "Failed to send completion notification for Job {JobId}", request.JobId);
         }
+
+        // Send email notification if configured
+        await SendEmailNotificationAsync(backupHistory, request, isSuccess: true, cancellationToken);
     }
 
     private async Task HandleFailedStatus(
@@ -227,6 +236,9 @@ public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStat
         {
             _logger.LogWarning(ex, "Failed to send failure notification for Job {JobId}", request.JobId);
         }
+
+        // Send email notification if configured
+        await SendEmailNotificationAsync(backupHistory, request, isSuccess: false, cancellationToken);
     }
 
     private async Task HandleCancelledStatus(
@@ -262,6 +274,108 @@ public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStat
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to send cancellation notification for Job {JobId}", request.JobId);
+        }
+    }
+
+    private async Task SendEmailNotificationAsync(
+        Domain.Entities.BackupHistory backupHistory,
+        UpdateBackupStatusCommand request,
+        bool isSuccess,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if we have a backup schedule with notification settings
+            if (backupHistory.BackupSchedule == null)
+            {
+                _logger.LogDebug("No BackupSchedule found for Job {JobId}, skipping email notification", request.JobId);
+                return;
+            }
+
+            var schedule = backupHistory.BackupSchedule;
+
+            // Apply notification rules based on schedule settings
+            bool shouldNotify = false;
+
+            if (isSuccess)
+            {
+                // For successful backups: only notify if NotifyOnCompletion is true AND NotifyOnlyOnFailure is false
+                shouldNotify = schedule.NotifyOnCompletion && !schedule.NotifyOnlyOnFailure;
+            }
+            else
+            {
+                // For failed backups: notify if either NotifyOnCompletion OR NotifyOnlyOnFailure is true
+                shouldNotify = schedule.NotifyOnCompletion || schedule.NotifyOnlyOnFailure;
+            }
+
+            if (!shouldNotify)
+            {
+                _logger.LogDebug("Email notification skipped for Job {JobId} based on schedule settings (NotifyOnCompletion={NotifyOnCompletion}, NotifyOnlyOnFailure={NotifyOnlyOnFailure})",
+                    request.JobId, schedule.NotifyOnCompletion, schedule.NotifyOnlyOnFailure);
+                return;
+            }
+
+            // Get the user who created the schedule from MasterDbContext
+            var userId = schedule.CreatedBy.ToString();
+            var user = await _masterContext.Users
+                .Where(u => u.Id == userId && u.TenantId == request.TenantId && u.IsActive)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (user == null)
+            {
+                _logger.LogWarning("User not found for schedule creator {CreatedBy}, TenantId {TenantId}. Cannot send email notification.",
+                    schedule.CreatedBy, request.TenantId);
+                return;
+            }
+
+            // Prepare email data
+            var scheduleName = schedule.Name ?? "Unnamed Schedule";
+            var databaseName = backupHistory.DatabaseConnection?.Name ?? backupHistory.DatabaseConnection?.Database ?? "Unknown Database";
+            var recipientName = $"{user.FirstName} {user.LastName}";
+
+            // Send appropriate email based on success/failure
+            if (isSuccess)
+            {
+                var fileSizeMB = backupHistory.BackupSizeMB ?? 0;
+                var duration = backupHistory.Duration ?? TimeSpan.Zero;
+                var completedAt = backupHistory.EndTime ?? DateTime.UtcNow;
+                var blobUrl = request.BlobUrl ?? "N/A";
+
+                await _emailService.SendBackupCompletedEmailAsync(
+                    user.Email!,
+                    recipientName,
+                    scheduleName,
+                    databaseName,
+                    fileSizeMB,
+                    blobUrl,
+                    completedAt,
+                    duration);
+
+                _logger.LogInformation("Backup completion email sent to {Email} for Job {JobId}",
+                    user.Email, request.JobId);
+            }
+            else
+            {
+                var errorMessage = request.ErrorMessage ?? "Unknown error occurred";
+                var failedAt = backupHistory.EndTime ?? DateTime.UtcNow;
+
+                await _emailService.SendBackupFailedEmailAsync(
+                    user.Email!,
+                    recipientName,
+                    scheduleName,
+                    databaseName,
+                    errorMessage,
+                    failedAt);
+
+                _logger.LogInformation("Backup failure email sent to {Email} for Job {JobId}",
+                    user.Email, request.JobId);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Don't fail the entire status update if email sending fails
+            _logger.LogError(ex, "Failed to send email notification for Job {JobId}. Email notification will be skipped.",
+                request.JobId);
         }
     }
 

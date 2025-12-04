@@ -74,7 +74,82 @@ public class EmailService : IEmailService
         await SendEmailAsync(user, subject, null, "4530", templateData);
     }
 
-    private async Task SendEmailAsync(ApplicationUser user, string subject, string? htmlBody, string templateId = null, Dictionary<string, string> templateData = null)
+    public async Task SendBackupCompletedEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string scheduleName,
+        string databaseName,
+        double fileSizeMB,
+        string blobUrl,
+        DateTime completedAt,
+        TimeSpan duration)
+    {
+        var subject = $"Backup completado: {scheduleName}";
+        var templateData = new Dictionary<string, string>
+        {
+            { "USERNAME", recipientName },
+            { "SCHEDULE_NAME", scheduleName },
+            { "DATABASE_NAME", databaseName },
+            { "BACKUP_SIZE", $"{fileSizeMB:F2} MB" },
+            { "DURATION", FormatDuration(duration) },
+            { "COMPLETION_TIME", completedAt.ToString("yyyy-MM-dd HH:mm:ss UTC") },
+            { "BLOB_URL", blobUrl }
+        };
+
+        await SendEmailDirectAsync(recipientEmail, recipientName, subject, "4540", templateData);
+    }
+
+    public async Task SendBackupFailedEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string scheduleName,
+        string databaseName,
+        string errorMessage,
+        DateTime failedAt)
+    {
+        var subject = $"Backup falló: {scheduleName}";
+        var templateData = new Dictionary<string, string>
+        {
+            { "USERNAME", recipientName },
+            { "SCHEDULE_NAME", scheduleName },
+            { "DATABASE_NAME", databaseName },
+            { "ERROR_MESSAGE", errorMessage },
+            { "FAILURE_TIME", failedAt.ToString("yyyy-MM-dd HH:mm:ss UTC") }
+        };
+
+        await SendEmailDirectAsync(recipientEmail, recipientName, subject, "4541", templateData);
+    }
+
+    public async Task SendBackupStartedEmailAsync(
+        string recipientEmail,
+        string recipientName,
+        string scheduleName,
+        string databaseName,
+        DateTime startedAt)
+    {
+        var subject = $"🔄 Backup iniciado: {scheduleName}";
+        var templateData = new Dictionary<string, string>
+        {
+            { "USERNAME", recipientName },
+            { "SCHEDULE_NAME", scheduleName },
+            { "DATABASE_NAME", databaseName },
+            { "START_TIME", startedAt.ToString("yyyy-MM-dd HH:mm:ss UTC") }
+        };
+
+        await SendEmailDirectAsync(recipientEmail, recipientName, subject, "4542", templateData);
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+            return $"{duration.Hours}h {duration.Minutes}m {duration.Seconds}s";
+        else if (duration.TotalMinutes >= 1)
+            return $"{duration.Minutes}m {duration.Seconds}s";
+        else
+            return $"{duration.Seconds}s";
+    }
+
+    private async Task SendEmailAsync(ApplicationUser user, string subject, string? htmlBody, string? templateId = null, Dictionary<string, string>? templateData = null)
     {
         try
         {
@@ -115,6 +190,50 @@ public class EmailService : IEmailService
         catch (Exception ex)
         {
             _logger.LogError(ex, $"Error sending email");
+            throw;
+        }
+    }
+
+    private async Task SendEmailDirectAsync(string recipientEmail, string recipientName, string subject, string templateId, Dictionary<string, string> templateData)
+    {
+        try
+        {
+            var apiKey = _configuration["Maileroo:ApiKey"];
+            var fromEmail = _configuration["Maileroo:FromEmail"];
+            var fromName = _configuration["Maileroo:FromName"];
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+
+            var emailPayload = new
+            {
+                from = new { address = fromEmail, display_name = fromName },
+                to = new[] { new { address = recipientEmail, display_name = recipientName } },
+                subject = subject,
+                template_id = templateId,
+                template_data = templateData
+            };
+
+            var content = new StringContent(
+                JsonSerializer.Serialize(emailPayload),
+                Encoding.UTF8,
+                "application/json"
+            );
+
+            var response = await client.PostAsync("https://smtp.maileroo.com/api/v2/emails/template", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError($"Failed to send email to {recipientEmail}. Status: {response.StatusCode}, Error: {errorContent}");
+                throw new Exception($"Failed to send email: {errorContent}");
+            }
+
+            _logger.LogInformation($"Email sent successfully to {recipientEmail}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error sending email to {recipientEmail}");
             throw;
         }
     }
