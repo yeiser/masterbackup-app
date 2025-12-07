@@ -511,15 +511,15 @@ export class BackupExecutionListComponent implements OnInit, OnDestroy {
   getStatusBadgeClass(status: BackupStatus): string {
     switch (status) {
       case BackupStatus.Completed:
-        return 'badge-success';
+        return 'badge-light-success';
       case BackupStatus.Failed:
-        return 'badge-danger';
+        return 'badge-light-danger';
       case BackupStatus.InProgress:
-        return 'badge-primary';
+        return 'badge-light-primary';
       case BackupStatus.Pending:
-        return 'badge-warning';
+        return 'badge-light-warning';
       case BackupStatus.Cancelled:
-        return 'badge-secondary';
+        return 'badge-light';
       default:
         return 'badge-light';
     }

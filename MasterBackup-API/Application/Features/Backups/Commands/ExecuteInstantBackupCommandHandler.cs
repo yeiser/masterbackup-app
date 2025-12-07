@@ -125,7 +125,9 @@ public class ExecuteInstantBackupCommandHandler : IRequestHandler<ExecuteInstant
                 CurrentRetry = 0,
                 ScheduledTime = DateTime.UtcNow,
                 CompressionType = request.CompressionType ?? "GZIP",
-                EncryptionKey = null // Optional: implement encryption key if needed
+                EncryptionKey = null, // Optional: implement encryption key if needed
+                AutoRestore = false, // Instant backups don't auto-restore
+                TargetDatabaseName = null
             };
 
             // 9. Publish message to RabbitMQ

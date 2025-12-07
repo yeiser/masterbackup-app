@@ -20,6 +20,7 @@ export interface BackupScheduleDto {
   priority?: number;
   notifyOnCompletion?: boolean;
   notifyOnlyOnFailure?: boolean;
+  autoRestore?: boolean;
   createdAt: Date;
   updatedAt?: Date;
   createdBy: string;
@@ -44,6 +45,7 @@ export interface CreateBackupScheduleDto {
   priority?: number;
   notifyOnCompletion?: boolean;
   notifyOnlyOnFailure?: boolean;
+  autoRestore?: boolean;
 }
 
 export interface UpdateBackupScheduleDto {
@@ -60,6 +62,7 @@ export interface UpdateBackupScheduleDto {
   priority?: number;
   notifyOnCompletion?: boolean;
   notifyOnlyOnFailure?: boolean;
+  autoRestore?: boolean;
 }
 
 export enum ScheduleType {

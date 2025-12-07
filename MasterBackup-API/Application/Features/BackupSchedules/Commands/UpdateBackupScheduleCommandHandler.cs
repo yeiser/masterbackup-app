@@ -59,6 +59,7 @@ public class UpdateBackupScheduleCommandHandler : IRequestHandler<UpdateBackupSc
             backupSchedule.Priority = request.Data.Priority;
             backupSchedule.NotifyOnCompletion = request.Data.NotifyOnCompletion;
             backupSchedule.NotifyOnlyOnFailure = request.Data.NotifyOnlyOnFailure;
+            backupSchedule.AutoRestore = request.Data.AutoRestore;
             backupSchedule.UpdatedAt = DateTime.UtcNow;
             backupSchedule.UpdatedBy = request.UpdatedBy;
 
@@ -111,6 +112,7 @@ public class UpdateBackupScheduleCommandHandler : IRequestHandler<UpdateBackupSc
             Priority = entity.Priority,
             NotifyOnCompletion = entity.NotifyOnCompletion,
             NotifyOnlyOnFailure = entity.NotifyOnlyOnFailure,
+            AutoRestore = entity.AutoRestore,
             CreatedAt = entity.CreatedAt,
             CreatedBy = entity.CreatedBy,
             UpdatedAt = entity.UpdatedAt,

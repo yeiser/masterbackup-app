@@ -130,6 +130,11 @@
                     <span class="badge me-2" [ngClass]="schedule.isActive ? 'badge-light-success' : 'badge-light'">
                       {{ schedule.isActive ? 'Activo' : 'Inactivo' }}
                     </span>
+
+                    <!-- Badge de restauración automática -->
+                    <span *ngIf="schedule.autoRestore" class="badge badge-light-info me-2">
+                      <i class="fa fa-rotate me-1"></i>Auto-Restore
+                    </span>
                   </div>
                   <!--end::Name-->
 
@@ -657,6 +662,22 @@
           </div>
 
           <div class="separator separator-dashed my-7"></div>
+
+          <!-- Restauración automática -->
+          <div class="fv-row mb-7">
+            <div class="form-check form-switch form-check-custom form-check-solid">
+              <input
+                class="form-check-input h-20px w-30px"
+                type="checkbox"
+                formControlName="autoRestore"
+                id="schedule_autoRestore"
+              />
+              <label class="form-check-label fw-bold" for="schedule_autoRestore">
+                Restauración Automática
+              </label>
+            </div>
+            <div class="form-text">Si está activado, el backup se restaurará automáticamente después de completarse con éxito</div>
+          </div>
 
           <!-- Estado activo -->
           <div class="fv-row mb-7">

@@ -132,6 +132,10 @@ public class BackupJob : IJob
             _logger.LogInformation("Created BackupHistory {BackupHistoryId} for Job {JobId}", 
                 backupHistory.Id, jobId);
 
+            // Extract database name for auto-restore
+            var dbName = backupSchedule.DatabaseConnection.Database;
+            var targetDbName = backupSchedule.AutoRestore ? $"{dbName}_DW" : null;
+
             // Create backup job message
             var backupJobMessage = new BackupJobMessage
             {
@@ -154,7 +158,9 @@ public class BackupJob : IJob
                 MaxRetries = backupSchedule.MaxRetries,
                 CurrentRetry = 0,
                 ScheduledTime = context.ScheduledFireTimeUtc?.DateTime ?? DateTime.UtcNow,
-                CompressionType = "gzip"
+                CompressionType = "gzip",
+                AutoRestore = backupSchedule.AutoRestore,
+                TargetDatabaseName = targetDbName
             };
 
             // Ensure tenant queue exists

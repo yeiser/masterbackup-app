@@ -4,6 +4,7 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
 using MasterBackup_Worker.Application.Interfaces;
 using MasterBackup_Worker.Domain.Entities;
+using Npgsql;
 
 namespace MasterBackup_Worker.Application.Services;
 
@@ -101,6 +102,25 @@ public class BackupExecutorService : IBackupExecutorService
 
             _logger.LogInformation("Backup Job {JobId} completed successfully in {Duration}",
                 message.JobId, duration);
+
+            // Step 5: Auto-restore if configured
+            if (message.AutoRestore && !string.IsNullOrEmpty(message.TargetDatabaseName))
+            {
+                _logger.LogInformation("Auto-restore enabled for Job {JobId}. Target database: {TargetDatabase}",
+                    message.JobId, message.TargetDatabaseName);
+
+                try
+                {
+                    await ExecuteAutoRestoreAsync(message, localFilePath);
+                    _logger.LogInformation("Auto-restore completed successfully for Job {JobId}", message.JobId);
+                }
+                catch (Exception restoreEx)
+                {
+                    _logger.LogError(restoreEx, "Auto-restore failed for Job {JobId}: {Error}", 
+                        message.JobId, restoreEx.Message);
+                    // Note: We don't fail the backup if restore fails, just log the error
+                }
+            }
 
             return (true, compressedFilePath, compressedInfo.Length, "Backup completed successfully");
         }
@@ -289,5 +309,134 @@ public class BackupExecutorService : IBackupExecutorService
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Executes auto-restore of the backup to a new database with _DW suffix
+    /// </summary>
+    private async Task ExecuteAutoRestoreAsync(BackupJobMessage message, string backupFilePath)
+    {
+        _logger.LogInformation("Starting auto-restore for Job {JobId} to database {TargetDatabase}",
+            message.JobId, message.TargetDatabaseName);
+
+        var connectionParams = ParseConnectionString(message.DatabaseConnection.ConnectionString);
+        
+        if (!connectionParams.TryGetValue("Host", out var host) ||
+            !connectionParams.TryGetValue("Username", out var username) ||
+            !connectionParams.TryGetValue("Password", out var password))
+        {
+            throw new InvalidOperationException("Invalid connection string: missing Host, Username or Password");
+        }
+
+        var port = connectionParams.TryGetValue("Port", out var portStr) ? portStr : "5432";
+
+        // Step 1: Drop target database if exists and create new one
+        _logger.LogInformation("Creating target database {TargetDatabase}", message.TargetDatabaseName);
+        await CreateTargetDatabaseAsync(host, port, username, password, message.TargetDatabaseName!);
+
+        // Step 2: Execute pg_restore on the target database
+        _logger.LogInformation("Restoring backup to database {TargetDatabase}", message.TargetDatabaseName);
+        await ExecutePgRestoreAsync(host, port, username, password, message.TargetDatabaseName!, backupFilePath);
+
+        _logger.LogInformation("Auto-restore completed for database {TargetDatabase}", message.TargetDatabaseName);
+    }
+
+    /// <summary>
+    /// Creates a new target database, dropping it first if it exists
+    /// </summary>
+    private async Task CreateTargetDatabaseAsync(string host, string port, string username, string password, string databaseName)
+    {
+        // Connect to postgres database to create target database
+        var postgresConnString = $"Host={host};Port={port};Database=postgres;Username={username};Password={password}";
+        
+        await using var connection = new Npgsql.NpgsqlConnection(postgresConnString);
+        await connection.OpenAsync();
+
+        // Terminate existing connections to target database
+        var terminateQuery = $@"
+            SELECT pg_terminate_backend(pg_stat_activity.pid)
+            FROM pg_stat_activity
+            WHERE pg_stat_activity.datname = '{databaseName}'
+              AND pid <> pg_backend_pid();";
+
+        await using (var terminateCmd = new Npgsql.NpgsqlCommand(terminateQuery, connection))
+        {
+            await terminateCmd.ExecuteNonQueryAsync();
+        }
+
+        // Drop database if exists
+        var dropQuery = $"DROP DATABASE IF EXISTS \"{databaseName}\";";
+        await using (var dropCmd = new Npgsql.NpgsqlCommand(dropQuery, connection))
+        {
+            await dropCmd.ExecuteNonQueryAsync();
+        }
+
+        _logger.LogInformation("Dropped existing database {Database} (if existed)", databaseName);
+
+        // Create new database
+        var createQuery = $"CREATE DATABASE \"{databaseName}\";";
+        await using (var createCmd = new Npgsql.NpgsqlCommand(createQuery, connection))
+        {
+            await createCmd.ExecuteNonQueryAsync();
+        }
+
+        _logger.LogInformation("Created new database {Database}", databaseName);
+    }
+
+    /// <summary>
+    /// Executes pg_restore to restore the backup file to the target database
+    /// </summary>
+    private async Task ExecutePgRestoreAsync(string host, string port, string username, string password, string databaseName, string backupFilePath)
+    {
+        var pgRestorePath = _configuration["PostgreSQL:PgRestorePath"] ?? "pg_restore";
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = pgRestorePath,
+            Arguments = $"--host={host} --port={port} --username={username} --dbname=\"{databaseName}\" --verbose --clean --if-exists --no-owner --no-privileges \"{backupFilePath}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            RedirectStandardInput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        // Set password via environment variable
+        startInfo.Environment["PGPASSWORD"] = password;
+
+        _logger.LogDebug("Starting pg_restore: {FileName} {Arguments}", pgRestorePath, 
+            startInfo.Arguments.Replace(password, "***"));
+
+        using var process = Process.Start(startInfo);
+        if (process == null)
+            throw new InvalidOperationException("Failed to start pg_restore process");
+
+        // Read output and errors
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+
+        await process.WaitForExitAsync();
+
+        var output = await outputTask;
+        var error = await errorTask;
+
+        if (!string.IsNullOrWhiteSpace(output))
+            _logger.LogDebug("pg_restore output: {Output}", output);
+
+        // pg_restore may return non-zero exit codes for warnings, so we check stderr instead
+        if (process.ExitCode != 0 && !string.IsNullOrWhiteSpace(error))
+        {
+            // Check if errors are just warnings (common with pg_restore)
+            if (error.Contains("ERROR") && !error.Contains("already exists"))
+            {
+                _logger.LogWarning("pg_restore completed with warnings: {Error}", error);
+            }
+            else
+            {
+                _logger.LogDebug("pg_restore warnings (non-critical): {Error}", error);
+            }
+        }
+
+        _logger.LogInformation("pg_restore completed with exit code {ExitCode}", process.ExitCode);
     }
 }

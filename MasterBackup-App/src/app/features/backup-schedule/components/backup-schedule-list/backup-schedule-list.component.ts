@@ -145,7 +145,8 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
       maxRetries: [3, [Validators.required, Validators.min(0), Validators.max(10)]],
       timeoutMinutes: [30, [Validators.required, Validators.min(1), Validators.max(1440)]],
       priority: [5, [Validators.required, Validators.min(1), Validators.max(10)]],
-      notificationMode: ['all'] // 'all' | 'failure' | 'none'
+      notificationMode: ['all'], // 'all' | 'failure' | 'none'
+      autoRestore: [false]
     });
 
     // Inicializar con cron por defecto
@@ -312,7 +313,8 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
       maxRetries: 3,
       timeoutMinutes: 30,
       priority: 5,
-      notificationMode: 'all'
+      notificationMode: 'all',
+      autoRestore: false
     });
     this.setCronFrequency('daily');
     this.showFormModal();
@@ -339,7 +341,8 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
       maxRetries: schedule.maxRetries ?? 3,
       timeoutMinutes: schedule.timeoutMinutes ?? 30,
       priority: schedule.priority ?? 5,
-      notificationMode: this.getNotificationMode(schedule)
+      notificationMode: this.getNotificationMode(schedule),
+      autoRestore: schedule.autoRestore ?? false
     });
 
     // Parse cron expression si es tipo Cron
@@ -372,7 +375,8 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
         timeoutMinutes: formValue.timeoutMinutes,
         priority: formValue.priority,
         notifyOnCompletion: formValue.notificationMode === 'all' || formValue.notificationMode === 'failure',
-        notifyOnlyOnFailure: formValue.notificationMode === 'failure'
+        notifyOnlyOnFailure: formValue.notificationMode === 'failure',
+        autoRestore: formValue.autoRestore ?? false
       };
 
       // Solo soportamos tipo Cron
@@ -411,7 +415,8 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
         timeoutMinutes: formValue.timeoutMinutes,
         priority: formValue.priority,
         notifyOnCompletion: formValue.notificationMode === 'all' || formValue.notificationMode === 'failure',
-        notifyOnlyOnFailure: formValue.notificationMode === 'failure'
+        notifyOnlyOnFailure: formValue.notificationMode === 'failure',
+        autoRestore: formValue.autoRestore ?? false
       };
 
       // Solo soportamos tipo Cron

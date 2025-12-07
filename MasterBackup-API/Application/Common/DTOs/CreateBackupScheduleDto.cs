@@ -73,4 +73,9 @@ public class CreateBackupScheduleDto
     /// Si es true, sobrescribe NotifyOnCompletion
     /// </summary>
     public bool NotifyOnlyOnFailure { get; set; } = false;
+
+    /// <summary>
+    /// Restaurar automáticamente el backup después de completarse (default: false)
+    /// </summary>
+    public bool AutoRestore { get; set; } = false;
 }

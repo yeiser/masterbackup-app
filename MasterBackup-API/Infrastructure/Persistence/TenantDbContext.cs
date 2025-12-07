@@ -207,6 +207,10 @@ public class TenantDbContext : DbContext
                 .IsRequired()
                 .HasDefaultValue(false);
             
+            entity.Property(e => e.AutoRestore)
+                .IsRequired()
+                .HasDefaultValue(false);
+            
             // ============================================
             // AUDITORÍA
             // ============================================
@@ -342,6 +346,7 @@ public class TenantDbContext : DbContext
             
             // Indexes
             entity.HasIndex(e => e.JobId)
+                .IsUnique()
                 .HasDatabaseName("IX_BackupHistories_JobId");
             
             entity.HasIndex(e => e.BackupScheduleId)

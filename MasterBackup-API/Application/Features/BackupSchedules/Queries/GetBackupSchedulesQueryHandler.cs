@@ -78,6 +78,7 @@ public class GetBackupSchedulesQueryHandler : IRequestHandler<GetBackupSchedules
             Priority = entity.Priority,
             NotifyOnCompletion = entity.NotifyOnCompletion,
             NotifyOnlyOnFailure = entity.NotifyOnlyOnFailure,
+            AutoRestore = entity.AutoRestore,
             CreatedAt = entity.CreatedAt,
             CreatedBy = entity.CreatedBy,
             UpdatedAt = entity.UpdatedAt,

@@ -64,6 +64,7 @@ public class CreateBackupScheduleCommandHandler : IRequestHandler<CreateBackupSc
                 Priority = request.Data.Priority,
                 NotifyOnCompletion = request.Data.NotifyOnCompletion,
                 NotifyOnlyOnFailure = request.Data.NotifyOnlyOnFailure,
+                AutoRestore = request.Data.AutoRestore,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = request.CreatedBy
                 // NextRun se calculará con Quartz.NET
@@ -124,6 +125,7 @@ public class CreateBackupScheduleCommandHandler : IRequestHandler<CreateBackupSc
             Priority = entity.Priority,
             NotifyOnCompletion = entity.NotifyOnCompletion,
             NotifyOnlyOnFailure = entity.NotifyOnlyOnFailure,
+            AutoRestore = entity.AutoRestore,
             CreatedAt = entity.CreatedAt,
             CreatedBy = entity.CreatedBy,
             UpdatedAt = entity.UpdatedAt,

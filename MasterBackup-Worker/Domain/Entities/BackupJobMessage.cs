@@ -18,6 +18,8 @@ public class BackupJobMessage
     public DateTime ScheduledTime { get; set; }
     public string? CompressionType { get; set; } // gzip, none, etc.
     public string? EncryptionKey { get; set; } // For future encrypted backups
+    public bool AutoRestore { get; set; } = false;
+    public string? TargetDatabaseName { get; set; } // Database name with _DW suffix for auto-restore
 }
 
 /// <summary>

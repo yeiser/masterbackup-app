@@ -201,7 +201,7 @@
               </div>
               <div class="progress h-6px">
                 <div class="progress-bar" 
-                     [ngClass]="'bg-' + getStatusBadgeClass(breakdown.status).replace('badge-', '')"
+                     [ngClass]="'bg-' + getStatusBadgeClass(breakdown.status).replace('badge-light-', '')"
                      role="progressbar" 
                      [style.width.%]="breakdown.percentage"></div>
               </div>
@@ -346,11 +346,9 @@
               </div>
             </th>
             <th class="min-w-150px">Base de Datos</th>
-            <th class="min-w-120px">Programación</th>
             <th class="min-w-100px">Estado</th>
             <th class="min-w-80px">Tipo</th>
             <th class="min-w-120px">Inicio</th>
-            <th class="min-w-100px">Duración</th>
             <th class="min-w-100px">Tamaño</th>
             <th class="min-w-80px text-end">Acciones</th>
           </tr>
@@ -372,24 +370,18 @@
                   <span class="text-dark fw-bold text-hover-primary fs-6">
                     {{ backup.databaseConnectionName }}
                   </span>
-                  <span class="text-muted fw-semibold text-muted d-block fs-7">
-                    Job ID: {{ backup.jobId.substring(0, 8) }}...
-                  </span>
                 </div>
               </div>
             </td>
             <td>
-              <span *ngIf="backup.backupScheduleName" class="text-dark fw-semibold d-block fs-6">
-                {{ backup.backupScheduleName }}
-              </span>
-              <span *ngIf="!backup.backupScheduleName" class="text-muted fs-7">
-                -
-              </span>
-            </td>
-            <td>
-              <span class="badge" [ngClass]="getStatusBadgeClass(backup.status)">
-                <i class="fas" [ngClass]="getStatusIcon(backup.status)" *ngIf="backup.status !== BackupStatus.InProgress"></i>
-                <i class="fas fa-spinner fa-spin" *ngIf="backup.status === BackupStatus.InProgress"></i>
+              <span class="badge" [ngClass]="{
+                'badge-light-success': backup.statusText === 'Completed',
+                'badge-light-danger': backup.statusText === 'Failed',
+                'badge-light-primary': backup.statusText === 'InProgress',
+                'badge-light-warning': backup.statusText === 'Pending',
+                'badge-light': backup.statusText === 'Cancelled'
+              }">
+                <i class="fas fa-spinner fa-spin" *ngIf="backup.statusText === 'InProgress'"></i>
                 {{ backup.statusText }}
               </span>
               <div *ngIf="backup.retryCount > 0" class="text-muted fs-7 mt-1">
@@ -397,8 +389,7 @@
               </div>
             </td>
             <td>
-              <span class="badge" [ngClass]="backup.isInstantBackup ? 'badge-light-info' : 'badge-light-primary'">
-                <i class="fas" [ngClass]="backup.isInstantBackup ? 'fa-hand-pointer' : 'fa-clock'"></i>
+              <span class="badge badge-light">
                 {{ backup.isInstantBackup ? 'Manual' : 'Programado' }}
               </span>
             </td>
@@ -407,23 +398,12 @@
                 <span class="text-dark fw-semibold d-block fs-6">
                   {{ formatDateTime(backup.startTime) }}
                 </span>
-                <span *ngIf="backup.endTime" class="text-muted fw-semibold d-block fs-7">
-                  Fin: {{ formatDateTime(backup.endTime) }}
-                </span>
               </div>
-            </td>
-            <td>
-              <span class="text-dark fw-semibold d-block fs-6">
-                {{ formatDuration(backup.duration) }}
-              </span>
             </td>
             <td>
               <div class="d-flex flex-column">
                 <span class="text-dark fw-semibold d-block fs-6">
                   {{ formatFileSize(backup.backupSizeMB) }}
-                </span>
-                <span *ngIf="backup.compressionType" class="text-muted fw-semibold d-block fs-7">
-                  {{ backup.compressionType }}
                 </span>
               </div>
             </td>

@@ -144,6 +144,11 @@ public class BackupSchedule
     /// </summary>
     public bool NotifyOnlyOnFailure { get; set; } = false;
     
+    /// <summary>
+    /// Indica si el backup debe ser restaurado automáticamente después de completarse
+    /// </summary>
+    public bool AutoRestore { get; set; } = false;
+    
     // ============================================
     // AUDITORÍA
     // ============================================

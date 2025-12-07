@@ -103,6 +103,11 @@ public class BackupScheduleDto
     public bool NotifyOnlyOnFailure { get; set; }
 
     /// <summary>
+    /// Restaurar automáticamente el backup después de completarse
+    /// </summary>
+    public bool AutoRestore { get; set; }
+
+    /// <summary>
     /// Fecha de creación
     /// </summary>
     public DateTime CreatedAt { get; set; }

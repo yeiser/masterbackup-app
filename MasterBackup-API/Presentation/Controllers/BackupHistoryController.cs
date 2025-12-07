@@ -18,11 +18,16 @@ public class BackupHistoryController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ILogger<BackupHistoryController> _logger;
+    private readonly Application.Common.Interfaces.IBlobStorageService _blobStorageService;
 
-    public BackupHistoryController(IMediator mediator, ILogger<BackupHistoryController> logger)
+    public BackupHistoryController(
+        IMediator mediator, 
+        ILogger<BackupHistoryController> logger,
+        Application.Common.Interfaces.IBlobStorageService blobStorageService)
     {
         _mediator = mediator;
         _logger = logger;
+        _blobStorageService = blobStorageService;
     }
 
     /// <summary>
@@ -257,16 +262,23 @@ public class BackupHistoryController : ControllerBase
     }
 
     /// <summary>
-    /// Download backup file from blob storage
+    /// Download backup file from blob storage with SAS token
     /// </summary>
     /// <param name="id">Backup history ID</param>
-    /// <returns>Backup file or redirect URL</returns>
+    /// <param name="expiryMinutes">SAS token expiry in minutes (default: 60)</param>
+    /// <returns>Secure download URL with SAS token</returns>
     [HttpGet("{id}/download")]
     [RoleAuthorization(UserRole.Admin, UserRole.User)]
-    public async Task<ActionResult> DownloadBackup(Guid id)
+    public async Task<ActionResult> DownloadBackup(Guid id, [FromQuery] int expiryMinutes = 60)
     {
         try
         {
+            // Validate expiry minutes (between 5 and 1440 minutes / 24 hours)
+            if (expiryMinutes < 5 || expiryMinutes > 1440)
+            {
+                return BadRequest(new { message = "Expiry minutes must be between 5 and 1440 (24 hours)" });
+            }
+
             var query = new GetBackupHistoryByIdQuery { Id = id };
             var backupHistory = await _mediator.Send(query);
 
@@ -275,26 +287,44 @@ public class BackupHistoryController : ControllerBase
                 return NotFound(new { message = $"Backup history with ID {id} not found" });
             }
 
-            if (string.IsNullOrEmpty(backupHistory.BlobUrl))
+            if (string.IsNullOrEmpty(backupHistory.BlobName))
             {
-                return NotFound(new { message = "Backup file URL not available" });
+                return NotFound(new { message = "Backup file name not available" });
             }
 
-            // Return the blob URL for client-side download
-            // In a production scenario, you might want to generate a SAS token for secure access
+            // Get tenant ID from HTTP context
+            var tenantIdClaim = User.FindFirst("TenantId")?.Value;
+            if (string.IsNullOrEmpty(tenantIdClaim) || !Guid.TryParse(tenantIdClaim, out var tenantId))
+            {
+                return Unauthorized(new { message = "Tenant ID not found in token" });
+            }
+
+            // Generate SAS URL for secure temporary access
+            var sasUrl = await _blobStorageService.GetBlobSasUrlAsync(tenantId, backupHistory.BlobName, expiryMinutes);
+
+            _logger.LogInformation("Generated download URL for backup {Id} (expires in {Minutes} minutes)", 
+                id, expiryMinutes);
+
             return Ok(new
             {
-                blobUrl = backupHistory.BlobUrl,
+                blobUrl = sasUrl,
                 blobName = backupHistory.BlobName,
                 backupSizeBytes = backupHistory.BackupSizeBytes,
                 backupSizeMB = backupHistory.BackupSizeMB,
-                message = "Use the provided URL to download the backup file"
+                expiresInMinutes = expiryMinutes,
+                expiresAt = DateTimeOffset.UtcNow.AddMinutes(expiryMinutes),
+                message = "Use the provided SAS URL to download the backup file. URL expires after specified time."
             });
+        }
+        catch (FileNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Backup file not found for ID: {Id}", id);
+            return NotFound(new { message = "Backup file not found in storage", error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting download URL for backup: {Id}", id);
-            return StatusCode(500, new { message = "Error getting download URL", error = ex.Message });
+            _logger.LogError(ex, "Error generating download URL for backup: {Id}", id);
+            return StatusCode(500, new { message = "Error generating download URL", error = ex.Message });
         }
     }
 
