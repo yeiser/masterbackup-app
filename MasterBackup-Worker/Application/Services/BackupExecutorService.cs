@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Formats.Tar;
 using System.IO.Compression;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
@@ -150,37 +151,38 @@ public class BackupExecutorService : IBackupExecutorService
 
     private async Task<string> ExecuteDatabaseDumpAsync(BackupJobMessage message)
     {
-        var outputFilePath = Path.Combine(_tempPath, $"{Guid.NewGuid()}.sql");
+        // Use directory format for better performance and parallelism
+        var outputDirectoryPath = Path.Combine(_tempPath, $"{Guid.NewGuid()}_backup");
         var databaseType = message.DatabaseConnection.DatabaseType.ToLower();
 
-        _logger.LogInformation("Executing {DatabaseType} dump to {OutputFile}", databaseType, outputFilePath);
+        _logger.LogInformation("Executing {DatabaseType} dump to {OutputDirectory}", databaseType, outputDirectoryPath);
 
         try
         {
             switch (databaseType)
             {
                 case "postgresql":
-                    await ExecutePostgreSQLDumpAsync(message.DatabaseConnection.ConnectionString, outputFilePath);
+                    await ExecutePostgreSQLDumpAsync(message.DatabaseConnection.ConnectionString, outputDirectoryPath);
                     break;
 
                 case "mysql":
-                    await ExecuteMySQLDumpAsync(message.DatabaseConnection.ConnectionString, outputFilePath);
+                    await ExecuteMySQLDumpAsync(message.DatabaseConnection.ConnectionString, outputDirectoryPath);
                     break;
 
                 case "sqlserver":
-                    await ExecuteSQLServerDumpAsync(message.DatabaseConnection.ConnectionString, outputFilePath);
+                    await ExecuteSQLServerDumpAsync(message.DatabaseConnection.ConnectionString, outputDirectoryPath);
                     break;
 
                 default:
                     throw new NotSupportedException($"Database type {databaseType} is not supported");
             }
 
-            if (!File.Exists(outputFilePath) || new FileInfo(outputFilePath).Length == 0)
+            if (!Directory.Exists(outputDirectoryPath) || Directory.GetFiles(outputDirectoryPath).Length == 0)
             {
-                throw new InvalidOperationException("Backup file was not created or is empty");
+                throw new InvalidOperationException("Backup directory was not created or is empty");
             }
 
-            return outputFilePath;
+            return outputDirectoryPath;
         }
         catch (Exception ex)
         {
@@ -189,7 +191,7 @@ public class BackupExecutorService : IBackupExecutorService
         }
     }
 
-    private async Task ExecutePostgreSQLDumpAsync(string connectionString, string outputFile)
+    private async Task ExecutePostgreSQLDumpAsync(string connectionString, string outputDirectory)
     {
         // Parse connection string
         var connDict = ParseConnectionString(connectionString);
@@ -199,15 +201,21 @@ public class BackupExecutorService : IBackupExecutorService
         var username = connDict.GetValueOrDefault("Username", "");
         var password = connDict.GetValueOrDefault("Password", "");
 
+        // Get number of CPU cores for parallelism
+        var jobs = (int)Math.Ceiling(Environment.ProcessorCount * 0.5);
+        
         // Get pg_dump path from configuration
         var pgDumpPath = _configuration["DatabaseTools:PostgreSQL:PgDumpPath"] ?? "pg_dump";
         
-        _logger.LogDebug("Using pg_dump from: {PgDumpPath}", pgDumpPath);
+        _logger.LogInformation("Using pg_dump from: {PgDumpPath} with {Jobs} parallel jobs", pgDumpPath, jobs);
+
+        // Create output directory if it doesn't exist
+        Directory.CreateDirectory(outputDirectory);
 
         var startInfo = new ProcessStartInfo
         {
             FileName = pgDumpPath,
-            Arguments = $"-h {host} -p {port} -U {username} -d {database} -F c -f \"{outputFile}\"",
+            Arguments = $"-h {host} -p {port} -U {username} -d {database} -F d -j {jobs} -f \"{outputDirectory}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -240,18 +248,20 @@ public class BackupExecutorService : IBackupExecutorService
         throw new NotImplementedException("SQL Server backup not yet implemented");
     }
 
-    private async Task<string> CompressBackupAsync(string inputFile, string compressionType)
+    private async Task<string> CompressBackupAsync(string inputDirectory, string compressionType)
     {
-        var outputFile = inputFile + ".gz";
+        var outputFile = inputDirectory + ".tar.gz";
 
-        _logger.LogInformation("Compressing backup file: {InputFile} -> {OutputFile}", inputFile, outputFile);
+        _logger.LogInformation("Compressing backup directory: {InputDirectory} -> {OutputFile}", inputDirectory, outputFile);
 
-        using (var inputStream = File.OpenRead(inputFile))
-        using (var outputStream = File.Create(outputFile))
-        using (var gzipStream = new GZipStream(outputStream, CompressionLevel.Optimal))
+        await Task.Run(() =>
         {
-            await inputStream.CopyToAsync(gzipStream);
-        }
+            using var fileStream = File.Create(outputFile);
+            using var gzipStream = new GZipStream(fileStream, CompressionLevel.Optimal);
+            
+            // Create tar archive from directory
+            TarFile.CreateFromDirectory(inputDirectory, gzipStream, includeBaseDirectory: false);
+        });
 
         return outputFile;
     }
@@ -386,14 +396,19 @@ public class BackupExecutorService : IBackupExecutorService
     /// <summary>
     /// Executes pg_restore to restore the backup file to the target database
     /// </summary>
-    private async Task ExecutePgRestoreAsync(string host, string port, string username, string password, string databaseName, string backupFilePath)
+    private async Task ExecutePgRestoreAsync(string host, string port, string username, string password, string databaseName, string backupDirectory)
     {
+        // Get number of CPU cores for parallelism
+        var jobs = (int)Math.Ceiling(Environment.ProcessorCount * 0.5);
+        
         var pgRestorePath = _configuration["PostgreSQL:PgRestorePath"] ?? "pg_restore";
+
+        _logger.LogInformation("Using pg_restore from: {PgRestorePath} with {Jobs} parallel jobs", pgRestorePath, jobs);
 
         var startInfo = new ProcessStartInfo
         {
             FileName = pgRestorePath,
-            Arguments = $"--host={host} --port={port} --username={username} --dbname=\"{databaseName}\" --verbose --clean --if-exists --no-owner --no-privileges \"{backupFilePath}\"",
+            Arguments = $"--host={host} --port={port} --username={username} --dbname=\"{databaseName}\" -j {jobs} --verbose --clean --if-exists --no-owner --no-privileges \"{backupDirectory}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             RedirectStandardInput = true,

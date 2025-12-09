@@ -276,6 +276,33 @@ public class ApiClient : IApiClient
 
         return null;
     }
+
+    /// <summary>
+    /// Get worker credentials (RabbitMQ + Azure Storage) from API
+    /// </summary>
+    public async Task<MasterBackup_Worker.Domain.Models.WorkerCredentialsDto> GetCredentialsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Requesting credentials from API...");
+            
+            var response = await _httpClient.GetAsync("api/workers/credentials", cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var credentials = await response.Content.ReadFromJsonAsync<MasterBackup_Worker.Domain.Models.WorkerCredentialsDto>(cancellationToken);
+            
+            if (credentials == null)
+                throw new InvalidOperationException("Failed to deserialize credentials from API");
+
+            _logger.LogInformation("✓ Credentials received from API (Queue: {QueueName})", credentials.RabbitMQ.QueueName);
+            return credentials;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Failed to get credentials from API");
+            throw new InvalidOperationException("Cannot obtain credentials from API. Please check API connectivity and API Key.", ex);
+        }
+    }
     
     // Response models
     private class RegisterWorkerResponse

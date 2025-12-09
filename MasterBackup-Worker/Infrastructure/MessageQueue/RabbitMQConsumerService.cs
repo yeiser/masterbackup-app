@@ -63,22 +63,38 @@ public class RabbitMQConsumerService : BackgroundService
             return;
         }
         
-        _logger.LogInformation("Worker registered with ID: {WorkerId}. Initializing RabbitMQ connection...", _workerConfig.WorkerId);
+        _logger.LogInformation("Worker registered with ID: {WorkerId}. Obtaining credentials from API...", _workerConfig.WorkerId);
         
-        // Unified queue name for all job types
-        _unifiedQueueName = $"tenant.{_workerConfig.TenantId}.jobs";
+        // Get credentials from API
+        MasterBackup_Worker.Domain.Models.WorkerCredentialsDto credentials;
+        try
+        {
+            credentials = await _apiClient.GetCredentialsAsync(stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to obtain credentials from API. RabbitMQ consumer will not start.");
+            return;
+        }
+
+        // Store Azure Storage connection string in environment (for BackupExecutorService)
+        Environment.SetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING", credentials.AzureStorageConnectionString);
+        _logger.LogInformation("✓ Azure Storage credentials configured");
+
+        // Use queue name from credentials
+        _unifiedQueueName = credentials.RabbitMQ.QueueName;
         
-        _logger.LogInformation("Worker will consume from UNIFIED queue:");
-        _logger.LogInformation("  Queue: {UnifiedQueue}", _unifiedQueueName);
-        _logger.LogInformation("  Handles: Backup Jobs, Test Connections, and all future job types");
+        _logger.LogInformation("Worker will consume from queue: {Queue}", _unifiedQueueName);
+        _logger.LogInformation("Connecting to RabbitMQ at {Host}:{Port}...", credentials.RabbitMQ.Host, credentials.RabbitMQ.Port);
         
-        // Initialize RabbitMQ connection
+        // Initialize RabbitMQ connection with credentials from API
         var factory = new ConnectionFactory
         {
-            HostName = _rabbitMQHost,
-            Port = _rabbitMQPort,
-            UserName = "guest",
-            Password = "guest",
+            HostName = credentials.RabbitMQ.Host,
+            Port = credentials.RabbitMQ.Port,
+            UserName = credentials.RabbitMQ.Username,
+            Password = credentials.RabbitMQ.Password,
+            VirtualHost = credentials.RabbitMQ.VirtualHost,
             AutomaticRecoveryEnabled = true,
             NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
         };

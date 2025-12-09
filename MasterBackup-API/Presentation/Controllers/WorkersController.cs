@@ -271,4 +271,40 @@ public class WorkersController : ControllerBase
             return StatusCode(500, new { message = "Error interno del servidor" });
         }
     }
+
+    /// <summary>
+    /// Get worker credentials (RabbitMQ + Azure Storage)
+    /// This endpoint provides sensitive credentials needed by the worker to operate
+    /// Requiere ApiKey del tenant en header: X-API-Key
+    /// </summary>
+    [HttpGet("credentials")]
+    [ProducesResponseType(typeof(WorkerCredentialsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<WorkerCredentialsDto>> GetCredentials()
+    {
+        try
+        {
+            // Get worker ID from API Key middleware context
+            var workerIdClaim = User.Claims.FirstOrDefault(c => c.Type == "WorkerId");
+            if (workerIdClaim == null || !Guid.TryParse(workerIdClaim.Value, out var workerId))
+            {
+                return Unauthorized(new { message = "Invalid API Key or Worker not found" });
+            }
+
+            var query = new GetWorkerCredentialsQuery { WorkerId = workerId };
+            var credentials = await _mediator.Send(query);
+
+            return Ok(credentials);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized attempt to get credentials: {Message}", ex.Message);
+            return Unauthorized(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting worker credentials");
+            return StatusCode(500, new { message = "Error interno del servidor" });
+        }
+    }
 }

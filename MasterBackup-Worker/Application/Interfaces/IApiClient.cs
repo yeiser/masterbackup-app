@@ -42,4 +42,9 @@ public interface IApiClient
         int currentActiveJobs,
         long? totalBackupsProcessed = null,
         long? totalBytesProcessed = null);
+
+    /// <summary>
+    /// Gets worker credentials (RabbitMQ + Azure Storage) from the API
+    /// </summary>
+    Task<MasterBackup_Worker.Domain.Models.WorkerCredentialsDto> GetCredentialsAsync(CancellationToken cancellationToken = default);
 }
