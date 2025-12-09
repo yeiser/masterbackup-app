@@ -24,15 +24,24 @@ public class GetWorkerCredentialsQueryHandler : IRequestHandler<GetWorkerCredent
 
     public async Task<WorkerCredentialsDto> Handle(GetWorkerCredentialsQuery request, CancellationToken cancellationToken)
     {
-        // Validate worker exists and is active
-        var worker = await _context.Workers
-            .Include(w => w.Tenant)
-            .FirstOrDefaultAsync(w => w.Id == request.WorkerId && w.IsActive, cancellationToken);
+        // Validate tenant exists and is active
+        var tenant = await _context.Tenants
+            .FirstOrDefaultAsync(t => t.Id == request.TenantId && t.IsActive, cancellationToken);
 
-        if (worker == null)
+        if (tenant == null)
         {
-            _logger.LogWarning("Worker {WorkerId} not found or inactive", request.WorkerId);
-            throw new UnauthorizedAccessException("Worker not found or inactive");
+            _logger.LogWarning("Tenant {TenantId} not found or inactive", request.TenantId);
+            throw new UnauthorizedAccessException("Tenant not found or inactive");
+        }
+
+        // Verify at least one active worker exists for this tenant
+        var hasActiveWorker = await _context.Workers
+            .AnyAsync(w => w.TenantId == request.TenantId && w.IsActive, cancellationToken);
+
+        if (!hasActiveWorker)
+        {
+            _logger.LogWarning("No active workers found for tenant {TenantId}", request.TenantId);
+            throw new UnauthorizedAccessException("No active workers found for this tenant");
         }
 
         // Get RabbitMQ credentials from configuration
@@ -46,7 +55,7 @@ public class GetWorkerCredentialsQueryHandler : IRequestHandler<GetWorkerCredent
         var rabbitMQVirtualHost = _configuration["RabbitMQ:VirtualHost"] ?? "/";
 
         // Queue name is tenant-specific
-        var queueName = $"backup-jobs-{worker.TenantId}";
+        var queueName = $"backup-jobs-{request.TenantId}";
 
         // Get Azure Storage connection string
         var azureStorageConnectionString = Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING")
@@ -55,8 +64,7 @@ public class GetWorkerCredentialsQueryHandler : IRequestHandler<GetWorkerCredent
 
         var containerPrefix = _configuration["AzureStorage:ContainerPrefix"] ?? "backups";
 
-        _logger.LogInformation("Providing credentials to worker {WorkerId} ({WorkerName}) for tenant {TenantId}",
-            worker.Id, worker.Name, worker.TenantId);
+        _logger.LogInformation("Providing credentials for tenant {TenantId}", request.TenantId);
 
         return new WorkerCredentialsDto
         {

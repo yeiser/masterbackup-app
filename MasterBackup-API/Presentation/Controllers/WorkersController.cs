@@ -284,14 +284,15 @@ public class WorkersController : ControllerBase
     {
         try
         {
-            // Get worker ID from API Key middleware context
-            var workerIdClaim = User.Claims.FirstOrDefault(c => c.Type == "WorkerId");
-            if (workerIdClaim == null || !Guid.TryParse(workerIdClaim.Value, out var workerId))
+            // Get tenant ID from middleware context (set by TenantMiddleware via API Key validation)
+            if (!HttpContext.Items.TryGetValue("TenantId", out var tenantIdObj) || 
+                !Guid.TryParse(tenantIdObj?.ToString(), out var tenantId))
             {
-                return Unauthorized(new { message = "Invalid API Key or Worker not found" });
+                _logger.LogWarning("TenantId not found in request context");
+                return Unauthorized(new { message = "Invalid API Key or Tenant not found" });
             }
 
-            var query = new GetWorkerCredentialsQuery { WorkerId = workerId };
+            var query = new GetWorkerCredentialsQuery { TenantId = tenantId };
             var credentials = await _mediator.Send(query);
 
             return Ok(credentials);
