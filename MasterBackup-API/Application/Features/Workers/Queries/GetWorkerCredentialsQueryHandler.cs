@@ -45,10 +45,10 @@ public class GetWorkerCredentialsQueryHandler : IRequestHandler<GetWorkerCredent
         }
 
         // Get RabbitMQ credentials from configuration
-        var rabbitMQHost = _configuration["RabbitMQ:Host"] 
+        var rabbitMQHost = _configuration["RabbitMQ:HostName"] ?? _configuration["RabbitMQ:Host"]
             ?? throw new InvalidOperationException("RabbitMQ Host not configured");
         var rabbitMQPort = _configuration.GetValue<int>("RabbitMQ:Port", 5672);
-        var rabbitMQUsername = _configuration["RabbitMQ:Username"] 
+        var rabbitMQUsername = _configuration["RabbitMQ:UserName"] ?? _configuration["RabbitMQ:Username"]
             ?? throw new InvalidOperationException("RabbitMQ Username not configured");
         var rabbitMQPassword = _configuration["RabbitMQ:Password"] 
             ?? throw new InvalidOperationException("RabbitMQ Password not configured");
