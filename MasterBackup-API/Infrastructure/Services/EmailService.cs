@@ -96,7 +96,7 @@ public class EmailService : IEmailService
             { "BLOB_URL", blobUrl }
         };
 
-        await SendEmailDirectAsync(recipientEmail, recipientName, subject, "4540", templateData);
+        await SendEmailDirectAsync(recipientEmail, recipientName, subject, "4713", templateData);
     }
 
     public async Task SendBackupFailedEmailAsync(
@@ -117,26 +117,7 @@ public class EmailService : IEmailService
             { "FAILURE_TIME", failedAt.ToString("yyyy-MM-dd HH:mm:ss UTC") }
         };
 
-        await SendEmailDirectAsync(recipientEmail, recipientName, subject, "4541", templateData);
-    }
-
-    public async Task SendBackupStartedEmailAsync(
-        string recipientEmail,
-        string recipientName,
-        string scheduleName,
-        string databaseName,
-        DateTime startedAt)
-    {
-        var subject = $"🔄 Backup iniciado: {scheduleName}";
-        var templateData = new Dictionary<string, string>
-        {
-            { "USERNAME", recipientName },
-            { "SCHEDULE_NAME", scheduleName },
-            { "DATABASE_NAME", databaseName },
-            { "START_TIME", startedAt.ToString("yyyy-MM-dd HH:mm:ss UTC") }
-        };
-
-        await SendEmailDirectAsync(recipientEmail, recipientName, subject, "4542", templateData);
+        await SendEmailDirectAsync(recipientEmail, recipientName, subject, "4719", templateData);
     }
 
     private string FormatDuration(TimeSpan duration)

@@ -171,7 +171,7 @@ public class BackupJob : IJob
 
             // Update LastRun and NextRun in BackupSchedule
             backupSchedule.LastRun = DateTime.UtcNow;
-            backupSchedule.NextRun = context.NextFireTimeUtc?.DateTime;
+            backupSchedule.NextRun = context.NextFireTimeUtc?.UtcDateTime;
             await tenantDbContext.SaveChangesAsync();
 
             _logger.LogInformation(

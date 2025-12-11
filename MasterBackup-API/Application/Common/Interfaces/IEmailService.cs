@@ -27,11 +27,4 @@ public interface IEmailService
         string databaseName,
         string errorMessage,
         DateTime failedAt);
-    
-    Task SendBackupStartedEmailAsync(
-        string recipientEmail,
-        string recipientName,
-        string scheduleName,
-        string databaseName,
-        DateTime startedAt);
 }
