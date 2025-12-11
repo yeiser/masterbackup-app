@@ -50,21 +50,33 @@ public class BackupExecutorService : IBackupExecutorService
                 message.JobId, message.TenantId, 25, "Executing database dump", 0, 0);
 
             localFilePath = await ExecuteDatabaseDumpAsync(message);
-            var fileInfo = new FileInfo(localFilePath);
+            
+            // Calculate directory size (supports both files and directories)
+            long directorySize = 0;
+            if (Directory.Exists(localFilePath))
+            {
+                directorySize = new DirectoryInfo(localFilePath)
+                    .GetFiles("*", SearchOption.AllDirectories)
+                    .Sum(file => file.Length);
+            }
+            else
+            {
+                directorySize = new FileInfo(localFilePath).Length;
+            }
 
             _logger.LogInformation("Database dump completed. Size: {SizeMB} MB", 
-                fileInfo.Length / (1024.0 * 1024.0));
+                directorySize / (1024.0 * 1024.0));
 
             // Step 2: Compress backup file (50%)
             await _statusReporter.ReportProgressAsync(
                 message.JobId, message.TenantId, 50, "Compressing backup file", 
-                fileInfo.Length, fileInfo.Length);
+                directorySize, directorySize);
 
             compressedFilePath = await CompressBackupAsync(localFilePath, message.CompressionType ?? "GZIP");
             var compressedInfo = new FileInfo(compressedFilePath);
 
             _logger.LogInformation("Backup compressed. Original: {OriginalMB} MB, Compressed: {CompressedMB} MB",
-                fileInfo.Length / (1024.0 * 1024.0),
+                directorySize / (1024.0 * 1024.0),
                 compressedInfo.Length / (1024.0 * 1024.0));
 
             // Step 3: Upload to Azure Blob Storage (75%)
@@ -87,9 +99,9 @@ public class BackupExecutorService : IBackupExecutorService
                 { "database_name", message.DatabaseConnection.Name },
                 { "database_type", message.DatabaseConnection.DatabaseType },
                 { "duration_seconds", duration.TotalSeconds.ToString("F2") },
-                { "original_size_bytes", fileInfo.Length.ToString() },
+                { "original_size_bytes", directorySize.ToString() },
                 { "compressed_size_bytes", compressedInfo.Length.ToString() },
-                { "compression_ratio", (compressedInfo.Length / (double)fileInfo.Length * 100).ToString("F2") + "%" }
+                { "compression_ratio", (compressedInfo.Length / (double)directorySize * 100).ToString("F2") + "%" }
             };
 
             await _statusReporter.ReportCompletedAsync(
@@ -306,17 +318,26 @@ public class BackupExecutorService : IBackupExecutorService
     {
         foreach (var filePath in filePaths)
         {
-            if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            if (string.IsNullOrEmpty(filePath)) continue;
+
+            try
             {
-                try
+                // Check if it's a directory
+                if (Directory.Exists(filePath))
+                {
+                    Directory.Delete(filePath, recursive: true);
+                    _logger.LogDebug("Deleted temporary directory: {FilePath}", filePath);
+                }
+                // Check if it's a file
+                else if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
                     _logger.LogDebug("Deleted temporary file: {FilePath}", filePath);
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to delete temporary file: {FilePath}", filePath);
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete temporary path: {FilePath}", filePath);
             }
         }
     }
