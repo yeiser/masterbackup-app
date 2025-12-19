@@ -533,7 +533,7 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
                 <div class="d-flex align-items-center mb-2">
                   <i class="fa fa-fingerprint text-primary me-2"></i>
                   <span class="fw-bold">Job ID:</span>
-                  <code class="ms-2">${result.value.jobId.substring(0, 8)}...</code>
+                  <code class="ms-2">${result.value.jobId ? result.value.jobId.substring(0, 8) + '...' : 'N/A'}</code>
                 </div>
                 <div class="d-flex align-items-center">
                   <i class="fa fa-clock text-info me-2"></i>
@@ -558,7 +558,7 @@ export class BackupScheduleListComponent implements OnInit, OnDestroy {
         }).then((historyResult) => {
           if (historyResult.isConfirmed) {
             // Navegar al historial de backups
-            window.location.href = '/backup-history';
+            window.location.href = '/activity';
           }
         });
         

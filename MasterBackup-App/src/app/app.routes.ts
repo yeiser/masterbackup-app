@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { LoginComponent } from './features/login/components/login.component';
 import { RegisterComponent } from './features/register/components/register.component';
-import { DashboardComponent } from './features/dashboard/components/dashboard/dashboard.component';
+import { DashboardComponent } from './features/dashboard/components/dashboard-page/dashboard.component';
 import { ResetPasswordComponent } from './features/reset-password/components/reset-password.component';
 import { ForgotPasswordComponent } from './features/forgot-password/components/forgot-password.component';
 import { DatabasesComponent } from './features/databases/components/databases.component';
@@ -10,6 +10,8 @@ import { WrapperComponent } from './layout/components/wrapper/wrapper.component'
 import { authGuard } from './core/guards/auth.guard';
 import { BackupScheduleListComponent } from './features/backup-schedule/components/backup-schedule-list/backup-schedule-list.component';
 import { BackupExecutionListComponent } from './features/backup-execution/components/backup-execution-list/backup-execution-list.component';
+import { NotificationsPageComponent } from './features/notifications/notifications-page.component';
+import { ProfileComponent } from './features/profile/components/profile-page/profile.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
@@ -31,6 +33,8 @@ export const routes: Routes = [
       { path: 'agents', component: WorkersComponent },
       { path: 'triggers', component: BackupScheduleListComponent },
       { path: 'activity', component: BackupExecutionListComponent },
+      { path: 'notifications', component: NotificationsPageComponent },
+      { path: 'profile', component: ProfileComponent },
       // Agregar más rutas aquí
     ]
   }

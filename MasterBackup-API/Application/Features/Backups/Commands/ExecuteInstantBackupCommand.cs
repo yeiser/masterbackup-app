@@ -11,6 +11,7 @@ public class ExecuteInstantBackupCommand : IRequest<ExecuteInstantBackupResult>
     public string? CompressionType { get; set; } = "GZIP";
     public int? TimeoutMinutes { get; set; }
     public int? MaxRetries { get; set; }
+    public string? InitiatedBy { get; set; }
 }
 
 /// <summary>

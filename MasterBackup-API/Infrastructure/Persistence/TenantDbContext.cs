@@ -22,14 +22,19 @@ public class TenantDbContext : DbContext
     public DbSet<DatabaseConnection> DatabaseConnections { get; set; }
     public DbSet<BackupSchedule> BackupSchedules { get; set; }
     public DbSet<BackupHistory> BackupHistories { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // Ignore ApplicationUser - it belongs to MasterDbContext only
+        modelBuilder.Ignore<ApplicationUser>();
+
         ConfigureDatabaseConnection(modelBuilder);
         ConfigureBackupSchedule(modelBuilder);
         ConfigureBackupHistory(modelBuilder);
+        ConfigureNotification(modelBuilder);
     }
 
     private void ConfigureDatabaseConnection(ModelBuilder modelBuilder)
@@ -363,6 +368,88 @@ public class TenantDbContext : DbContext
             
             entity.HasIndex(e => e.IsInstantBackup)
                 .HasDatabaseName("IX_BackupHistories_IsInstantBackup");
+        });
+    }
+
+    private void ConfigureNotification(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("notifications");
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+            
+            entity.Property(e => e.TenantId)
+                .HasColumnName("tenant_id")
+                .IsRequired();
+            
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id")
+                .IsRequired()
+                .HasMaxLength(450);
+            
+            entity.Property(e => e.Type)
+                .HasColumnName("type")
+                .IsRequired()
+                .HasMaxLength(50);
+            
+            entity.Property(e => e.Title)
+                .HasColumnName("title")
+                .IsRequired()
+                .HasMaxLength(200);
+            
+            entity.Property(e => e.Message)
+                .HasColumnName("message")
+                .IsRequired()
+                .HasMaxLength(1000);
+            
+            entity.Property(e => e.RedirectUrl)
+                .HasColumnName("redirect_url")
+                .HasMaxLength(500);
+            
+            entity.Property(e => e.RelatedEntityId)
+                .HasColumnName("related_entity_id");
+            
+            entity.Property(e => e.RelatedEntityType)
+                .HasColumnName("related_entity_type")
+                .HasMaxLength(100);
+            
+            entity.Property(e => e.IsRead)
+                .HasColumnName("is_read")
+                .IsRequired()
+                .HasDefaultValue(false);
+            
+            entity.Property(e => e.ReadAt)
+                .HasColumnName("read_at");
+            
+            entity.Property(e => e.Metadata)
+                .HasColumnName("metadata");
+            
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("created_at")
+                .IsRequired()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            
+            entity.Property(e => e.ExpiresAt)
+                .HasColumnName("expires_at");
+            
+            // Índices
+            entity.HasIndex(e => e.UserId)
+                .HasDatabaseName("IX_notifications_user_id");
+            
+            entity.HasIndex(e => e.TenantId)
+                .HasDatabaseName("IX_notifications_tenant_id");
+            
+            entity.HasIndex(e => new { e.UserId, e.IsRead })
+                .HasDatabaseName("IX_notifications_user_id_is_read");
+            
+            entity.HasIndex(e => e.CreatedAt)
+                .HasDatabaseName("IX_notifications_created_at");
+            
+            // NO hay foreign key a ApplicationUser porque los usuarios están en MasterDb
+            // UserId es un string que hace referencia lógica pero sin constraint de FK
         });
     }
 }

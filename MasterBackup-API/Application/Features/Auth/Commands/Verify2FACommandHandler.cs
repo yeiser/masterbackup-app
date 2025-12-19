@@ -86,6 +86,10 @@ public class Verify2FACommandHandler : IRequestHandler<Verify2FACommand, AuthRes
             // Generar token JWT
             var token = GenerateJwtToken(user, user.TenantId);
 
+            // Obtener información del tenant
+            var tenant = await _masterContext.Tenants
+                .FirstOrDefaultAsync(t => t.Id == user.TenantId, cancellationToken);
+
             _logger.LogInformation("2FA verification successful for user: {Email}", request.Dto.Email);
 
             return new AuthResponseDto
@@ -98,6 +102,9 @@ public class Verify2FACommandHandler : IRequestHandler<Verify2FACommand, AuthRes
                 LastName = user.LastName,
                 Role = user.Role.ToString(),
                 TenantId = user.TenantId.ToString(),
+                TenantName = tenant?.Name,
+                PhoneNumber = user.PhoneNumber,
+                CreatedAt = user.CreatedAt,
                 TwoFactorRequired = false,
                 User = new UserDto
                 {
@@ -105,7 +112,10 @@ public class Verify2FACommandHandler : IRequestHandler<Verify2FACommand, AuthRes
                     Email = user.Email!,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    Role = user.Role.ToString()
+                    Role = user.Role.ToString(),
+                    TenantName = tenant?.Name,
+                    PhoneNumber = user.PhoneNumber,
+                    CreatedAt = user.CreatedAt
                 }
             };
         }

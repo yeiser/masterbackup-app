@@ -14,6 +14,11 @@ public class MasterDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ApplicationLog> Logs { get; set; }
     public DbSet<UserInvitation> UserInvitations { get; set; }
     public DbSet<Worker> Workers { get; set; }
+    public DbSet<ApiKeyLog> ApiKeyLogs { get; set; }
+    public DbSet<Plan> Plans { get; set; }
+    public DbSet<PlanFeature> PlanFeatures { get; set; }
+    public DbSet<Subscription> Subscriptions { get; set; }
+    public DbSet<Payment> Payments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -56,6 +61,74 @@ public class MasterDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(e => e.LastHeartbeat);
             entity.Property(e => e.Status).HasConversion<int>();
             entity.Property(e => e.Tags).HasColumnType("text[]");
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ApiKeyLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => new { e.TenantId, e.CreatedAt });
+        });
+
+        modelBuilder.Entity<Plan>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => e.DisplayOrder);
+            entity.Property(e => e.MonthlyPrice).HasPrecision(10, 2);
+            entity.Property(e => e.YearlyPrice).HasPrecision(10, 2);
+        });
+
+        modelBuilder.Entity<PlanFeature>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.PlanId);
+            entity.HasOne(e => e.Plan)
+                .WithMany(p => p.Features)
+                .HasForeignKey(e => e.PlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Subscription>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => e.PlanId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => new { e.TenantId, e.Status });
+            entity.Property(e => e.Status).HasConversion<int>();
+            entity.Property(e => e.BillingCycle).HasConversion<int>();
+            entity.Property(e => e.Amount).HasPrecision(10, 2);
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Plan)
+                .WithMany(p => p.Subscriptions)
+                .HasForeignKey(e => e.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.SubscriptionId);
+            entity.HasIndex(e => e.TenantId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.TransactionId);
+            entity.Property(e => e.Status).HasConversion<int>();
+            entity.Property(e => e.Method).HasConversion<int>();
+            entity.Property(e => e.Amount).HasPrecision(10, 2);
+            entity.HasOne(e => e.Subscription)
+                .WithMany(s => s.Payments)
+                .HasForeignKey(e => e.SubscriptionId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.Tenant)
                 .WithMany()
                 .HasForeignKey(e => e.TenantId)

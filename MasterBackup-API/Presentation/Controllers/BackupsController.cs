@@ -37,12 +37,16 @@ public class BackupsController : ControllerBase
     {
         try
         {
+            // Get current user ID from claims
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            
             var command = new ExecuteInstantBackupCommand
             {
                 DatabaseConnectionId = request.DatabaseConnectionId,
                 CompressionType = request.CompressionType ?? "GZIP",
                 TimeoutMinutes = request.TimeoutMinutes,
-                MaxRetries = request.MaxRetries
+                MaxRetries = request.MaxRetries,
+                InitiatedBy = userId
             };
 
             var result = await _mediator.Send(command);

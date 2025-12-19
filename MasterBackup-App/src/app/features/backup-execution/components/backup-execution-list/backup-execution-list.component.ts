@@ -14,6 +14,7 @@ import { DatabaseConnectionService } from '../../../databases/services/database-
 import { DatabaseConnectionDto } from '../../../databases/models/database-connection.models';
 import { BackupScheduleService } from '../../../backup-schedule/services/backup-schedule.service';
 import { BackupScheduleDto } from '../../../backup-schedule/models/backup-schedule.models';
+import { SignalRService } from '../../../../core/services/signalr.service';
 
 declare var KTMenu: any;
 
@@ -46,7 +47,7 @@ export class BackupExecutionListComponent implements OnInit, OnDestroy {
   // Estados
   BackupStatus = BackupStatus;
   loading: boolean = false;
-  showFilters: boolean = true;
+  showFilters: boolean = false;
   viewMode: 'list' | 'grouped' | 'statistics' = 'list';
   
   // Alertas
@@ -57,11 +58,15 @@ export class BackupExecutionListComponent implements OnInit, OnDestroy {
   // Math para template
   Math = Math;
 
+  // Progreso en tiempo real por jobId
+  backupProgress: Map<string, { percentage: number; currentStep: string }> = new Map();
+
   constructor(
     private fb: FormBuilder,
     private backupHistoryService: BackupHistoryService,
     private databaseConnectionService: DatabaseConnectionService,
-    private backupScheduleService: BackupScheduleService
+    private backupScheduleService: BackupScheduleService,
+    private signalRService: SignalRService
   ) {
     this.filterForm = this.fb.group({
       searchTerm: [''],
@@ -81,6 +86,7 @@ export class BackupExecutionListComponent implements OnInit, OnDestroy {
     this.loadBackupSchedules();
     this.loadBackupHistories();
     this.loadStatistics();
+    this.subscribeToSignalREvents();
     
     // Suscribirse a cambios en filtros
     this.filterForm.valueChanges
@@ -94,6 +100,113 @@ export class BackupExecutionListComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  /**
+   * Suscribirse a eventos de SignalR para actualizaciones en tiempo real
+   */
+  private subscribeToSignalREvents(): void {
+    // Evento: Backup iniciado
+    this.signalRService.backupStarted$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(event => {
+        console.log('✓ Backup iniciado:', event);
+        
+        // Buscar si el backup ya existe en la lista
+        const existingBackup = this.backupHistories.find(b => b.jobId === event.jobId);
+        
+        if (!existingBackup) {
+          // Si no existe, recargar la lista para obtenerlo
+          this.loadBackupHistories();
+        } else {
+          // Actualizar estado a InProgress
+          existingBackup.status = BackupStatus.InProgress;
+          existingBackup.statusText = 'InProgress';
+        }
+
+        // Inicializar progreso
+        this.backupProgress.set(event.jobId, {
+          percentage: 0,
+          currentStep: 'Iniciando backup...'
+        });
+      });
+
+    // Evento: Progreso de backup
+    this.signalRService.backupProgress$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(event => {
+        console.log('✓ Progreso de backup:', event);
+        
+        // Actualizar progreso
+        this.backupProgress.set(event.jobId, {
+          percentage: event.data.progressPercentage,
+          currentStep: event.data.currentStep
+        });
+
+        // Buscar el backup en la lista y actualizar su estado si es necesario
+        const backup = this.backupHistories.find(b => b.jobId === event.jobId);
+        if (backup && backup.status !== BackupStatus.InProgress) {
+          backup.status = BackupStatus.InProgress;
+          backup.statusText = 'InProgress';
+        }
+      });
+
+    // Evento: Backup completado
+    this.signalRService.backupCompleted$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(event => {
+        console.log('✓ Backup completado:', event);
+        
+        // Buscar el backup en la lista
+        const backup = this.backupHistories.find(b => b.jobId === event.jobId);
+        
+        if (backup) {
+          // Actualizar estado
+          backup.status = BackupStatus.Completed;
+          backup.statusText = 'Completed';
+          backup.endTime = event.timestamp;
+          backup.duration = event.data.duration;
+          backup.backupSizeMB = event.data.backupSizeMB;
+          backup.blobUrl = event.data.blobUrl;
+        }
+
+        // Limpiar progreso
+        this.backupProgress.delete(event.jobId);
+
+        // Recargar estadísticas
+        this.loadStatistics();
+        
+        // Mostrar notificación de éxito
+        this.showAlert(`Backup completado: ${event.data.databaseName}`, 'success');
+      });
+
+    // Evento: Backup fallido
+    this.signalRService.backupFailed$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(event => {
+        console.log('✗ Backup fallido:', event);
+        
+        // Buscar el backup en la lista
+        const backup = this.backupHistories.find(b => b.jobId === event.jobId);
+        
+        if (backup) {
+          // Actualizar estado
+          backup.status = BackupStatus.Failed;
+          backup.statusText = 'Failed';
+          backup.endTime = event.timestamp;
+          backup.errorMessage = event.data.errorMessage;
+          backup.errorCode = event.data.errorCode;
+        }
+
+        // Limpiar progreso
+        this.backupProgress.delete(event.jobId);
+
+        // Recargar estadísticas
+        this.loadStatistics();
+        
+        // Mostrar notificación de error
+        this.showAlert(`Backup fallido: ${event.data.databaseName}`, 'error');
+      });
   }
 
   /**
@@ -594,5 +707,26 @@ export class BackupExecutionListComponent implements OnInit, OnDestroy {
     this.loadBackupHistories();
     this.loadStatistics();
     this.showAlert('Datos actualizados', 'success');
+  }
+
+  /**
+   * Obtener progreso de un backup
+   */
+  getBackupProgress(jobId: string): { percentage: number; currentStep: string } | undefined {
+    return this.backupProgress.get(jobId);
+  }
+
+  /**
+   * Verificar si un backup tiene progreso activo
+   */
+  hasActiveProgress(jobId: string): boolean {
+    return this.backupProgress.has(jobId);
+  }
+
+  /**
+   * Verificar si un backup está en progreso
+   */
+  isBackupInProgress(backup: BackupHistoryDto): boolean {
+    return backup.status === BackupStatus.InProgress || this.hasActiveProgress(backup.jobId);
   }
 }

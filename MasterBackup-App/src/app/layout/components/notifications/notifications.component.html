@@ -1,0 +1,139 @@
+<!--begin::Menu- wrapper-->
+<div
+  class="btn btn-icon btn-active-light-primary position-relative w-30px h-30px w-md-40px h-md-40px"
+  data-kt-menu-trigger="click"
+  data-kt-menu-attach="parent"
+  data-kt-menu-placement="bottom-end"
+>
+  <!--begin::Svg Icon | path: icons/duotune/general/gen022.svg-->
+  <span class="svg-icon svg-icon-1">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <path
+        opacity="0.3"
+        d="M20 3H4C2.89543 3 2 3.89543 2 5V16C2 17.1046 2.89543 18 4 18H4.5C5.05228 18 5.5 18.4477 5.5 19V21.5052C5.5 22.1441 6.21212 22.5253 6.74376 22.1708L11.4885 19.0077C12.4741 18.3506 13.6321 18 14.8167 18H20C21.1046 18 22 17.1046 22 16V5C22 3.89543 21.1046 3 20 3Z"
+        fill="black"
+      />
+      <rect x="6" y="12" width="7" height="2" rx="1" fill="black" />
+      <rect x="6" y="7" width="12" height="2" rx="1" fill="black" />
+    </svg>
+  </span>
+  <!--end::Svg Icon-->
+  <span
+    *ngIf="unreadCount() > 0"
+    class="bullet bullet-dot bg-success h-6px w-6px position-absolute translate-middle top-0 start-50 animation-blink"
+  ></span>
+</div>
+<!--begin::Menu-->
+<div
+  class="menu menu-sub menu-sub-dropdown menu-column w-350px w-lg-375px"
+  data-kt-menu="true"
+>
+  <!--begin::Heading-->
+  <div
+    class="d-flex flex-column bgi-no-repeat rounded-top"
+    style="background-image: url('assets/media/misc/pattern-1.jpg')"
+  >
+    <!--begin::Title-->
+    <h3 class="text-white fw-bold px-9 mt-10 mb-6">
+      Notificaciones
+      <span class="fs-8 opacity-75 ps-3" *ngIf="unreadCount() > 0">
+        {{ unreadCount() }} sin leer
+      </span>
+    </h3>
+    <!--end::Title-->
+  </div>
+  <!--end::Heading-->
+  <!--begin::Tab content-->
+  <div class="tab-content">
+    <!--begin::Tab panel-->
+    <div
+      class="tab-pane fade show active"
+      id="kt_topbar_notifications_1"
+      role="tabpanel"
+    >
+      <!--begin::Items-->
+      <div class="scroll-y mh-325px my-5 px-8" id="notificaciones">
+        
+        <!-- Loading state -->
+        <div *ngIf="isLoading" class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div *ngIf="!isLoading && notifications().length === 0" class="text-center py-5">
+          <div class="text-gray-500 fs-6">
+            <i class="bi bi-bell-slash fs-2x mb-3"></i>
+            <p class="mb-0">No tienes notificaciones</p>
+          </div>
+        </div>
+
+        <!-- Notifications list -->
+        <div 
+          *ngFor="let notification of notifications()" 
+          class="d-flex flex-stack py-4 cursor-pointer notification-item"
+          [class.bg-light-primary]="!notification.isRead"
+          (click)="onNotificationClick(notification)"
+        >
+          <!--begin::Section-->
+          <div class="d-flex align-items-start">
+            <!--begin::Icon-->
+            <div class="symbol symbol-35px me-4">
+              <span class="symbol-label">
+                <i [class]="getNotificationIcon(notification.type)" class="fs-2"></i>
+              </span>
+            </div>
+            <!--end::Icon-->
+            <!--begin::Content-->
+            <div class="mb-0 me-2 flex-grow-1">
+              <a
+                href="javascript:void(0)"
+                class="fs-6 text-gray-800 text-hover-primary fw-bolder"
+                [class.fw-bold]="!notification.isRead"
+              >
+                {{ notification.title }}
+              </a>
+              <div class="text-gray-600 fs-7 mt-1">
+                {{ notification.message }}
+              </div>
+            </div>
+            <!--end::Content-->
+          </div>
+          <!--end::Section-->
+          <!--begin::Label-->
+          <div class="d-flex flex-column align-items-end">
+            <span class="badge badge-light fs-8 mb-1">
+              {{ getRelativeTime(notification.createdAt) }}
+            </span>
+          </div>
+          <!--end::Label-->
+        </div>
+
+      </div>
+      <!--end::Items-->
+      
+      <!--begin::View All-->
+      <div *ngIf="notifications().length > 0" class="py-3 text-center border-top menu-item">
+        <a
+          routerLink="/notifications"
+          class="btn btn-color-gray-600 btn-active-color-primary menu-link"
+        >
+          Ver todas las notificaciones
+          <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+      </div>
+      <!--end::View All-->
+    </div>
+    <!--end::Tab panel-->
+  </div>
+  <!--end::Tab content-->
+</div>
+<!--end::Menu-->
+<!--end::Menu wrapper-->

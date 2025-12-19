@@ -1,9 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using MasterBackup_API.Application.Common.Interfaces;
 using MasterBackup_API.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace MasterBackup_API.Infrastructure.Services;
 

@@ -253,19 +253,48 @@ public class NotificationService : INotificationService
     }
 
     /// <summary>
-    /// Send notification to specific user
+    /// Send notification to specific user using user group
     /// </summary>
     public async Task NotifyUserAsync(Guid userId, string method, object data)
     {
         try
         {
+            // Send to user-specific group
             await _hubContext.Clients
-                .User(userId.ToString())
+                .Group($"user_{userId}")
                 .SendAsync(method, data);
 
             _logger.LogInformation(
                 "Sent {Method} notification to user {UserId}",
                 method, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending {Method} notification to user {UserId}", method, userId);
+        }
+    }
+
+    /// <summary>
+    /// Send notification to specific user by user ID string (for string-based IDs)
+    /// </summary>
+    public async Task NotifyUserByStringIdAsync(string userId, string method, object data)
+    {
+        try
+        {
+            var groupName = $"user_{userId}";
+            
+            _logger.LogInformation(
+                "Attempting to send {Method} notification to user group {GroupName}. Data: {@Data}",
+                method, groupName, data);
+            
+            // Send to user-specific group
+            await _hubContext.Clients
+                .Group(groupName)
+                .SendAsync(method, data);
+
+            _logger.LogInformation(
+                "Sent {Method} notification to user {UserId} (group: {GroupName})",
+                method, userId, groupName);
         }
         catch (Exception ex)
         {

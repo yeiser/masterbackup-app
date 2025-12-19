@@ -1,0 +1,35 @@
+.timeline {
+  position: relative;
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 19px;
+  top: 40px;
+  bottom: -20px;
+  border-left: 2px dashed #e4e6ef;
+}
+
+.timeline-icon {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.timeline-content {
+  flex-grow: 1;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.border-3 {
+  border-width: 3px !important;
+}

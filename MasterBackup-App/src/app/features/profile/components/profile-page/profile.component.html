@@ -1,0 +1,25 @@
+<app-navbar-profile (tabChange)="onTabChange($event)"></app-navbar-profile>
+
+<!-- Tab Content -->
+<div class="tab-content" id="myTabContent">
+  <!-- Information Tab -->
+  <div class="tab-pane fade" [class.show]="activeTab === 'profile'" [class.active]="activeTab === 'profile'" id="kt_tab_pane_1" role="tabpanel">
+    <app-information-tab *ngIf="activeTab === 'profile'"></app-information-tab>
+  </div>
+
+  <!-- Security Tab -->
+  <div class="tab-pane fade" [class.show]="activeTab === 'security'" [class.active]="activeTab === 'security'" id="kt_tab_pane_2" role="tabpanel">
+    <!-- Contenido de seguridad (cambiar contraseña, 2FA, etc.) -->
+    <app-security-tab *ngIf="activeTab === 'security'"></app-security-tab>
+  </div>
+
+  <!-- Organization Tab -->
+  <div class="tab-pane fade" [class.show]="activeTab === 'tenant'" [class.active]="activeTab === 'tenant'" id="kt_tab_pane_3" role="tabpanel">
+    <app-organization-tab *ngIf="activeTab === 'tenant'"></app-organization-tab>
+  </div>
+
+  <!-- Apikey Tab -->
+  <div class="tab-pane fade" [class.show]="activeTab === 'apikey'" [class.active]="activeTab === 'apikey'" id="kt_tab_pane_4" role="tabpanel">
+    <app-apikey-tab *ngIf="activeTab === 'apikey'"></app-apikey-tab>
+  </div>
+</div>

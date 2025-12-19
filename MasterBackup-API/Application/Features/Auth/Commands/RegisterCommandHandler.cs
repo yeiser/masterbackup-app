@@ -106,14 +106,25 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
                 Success = true,
                 Token = token,
                 ApiKey = tenant.ApiKey,
+                UserId = user.Id,
+                Email = user.Email!,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Role = user.Role.ToString(),
                 TenantId = tenant.Id.ToString(),
+                TenantName = tenant.Name,
+                PhoneNumber = user.PhoneNumber,
+                CreatedAt = user.CreatedAt,
                 User = new UserDto
                 {
                     Id = user.Id,
                     Email = user.Email!,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    Role = user.Role.ToString()
+                    Role = user.Role.ToString(),
+                    TenantName = tenant.Name,
+                    PhoneNumber = user.PhoneNumber,
+                    CreatedAt = user.CreatedAt
                 }
             };
         }

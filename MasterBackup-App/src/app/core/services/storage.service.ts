@@ -20,7 +20,8 @@ export class StorageService {
     try {
       return JSON.parse(accounts).map((acc: any) => ({
         ...acc,
-        lastLogin: new Date(acc.lastLogin)
+        lastLogin: new Date(acc.lastLogin),
+        createdAt: acc.createdAt ? new Date(acc.createdAt) : undefined
       }));
     } catch {
       return [];

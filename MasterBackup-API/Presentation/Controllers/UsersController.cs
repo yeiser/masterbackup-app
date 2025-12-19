@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MasterBackup_API.Application.Common.DTOs;
 using MasterBackup_API.Application.Features.Auth.Commands;
+using MasterBackup_API.Application.Features.Users.Commands;
 using MasterBackup_API.Domain.Enums;
 using MasterBackup_API.Infrastructure.Middleware;
 using System.Security.Claims;
@@ -24,6 +25,136 @@ public class UsersController : ControllerBase
         _mediator = mediator;
         _logger = logger;
         _inviteUserValidator = inviteUserValidator;
+    }
+
+    /// <summary>
+    /// Get current user profile
+    /// </summary>
+    [HttpGet("profile")]
+    public async Task<IActionResult> GetProfile()
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var command = new GetUserProfileCommand(userId);
+        var result = await _mediator.Send(command);
+
+        if (result == null)
+        {
+            return NotFound(new { message = "Usuario no encontrado" });
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Update current user profile
+    /// </summary>
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto updateProfileDto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var command = new UpdateUserProfileCommand(userId, updateProfileDto);
+        var result = await _mediator.Send(command);
+
+        if (result == null)
+        {
+            return BadRequest(new { message = "No se pudo actualizar el perfil" });
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Verify current password
+    /// </summary>
+    [HttpPost("verify-password")]
+    public async Task<IActionResult> VerifyPassword([FromBody] VerifyPasswordDto verifyPasswordDto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var command = new VerifyPasswordCommand(userId, verifyPasswordDto.Password);
+        var result = await _mediator.Send(command);
+
+        return Ok(new { valid = result });
+    }
+
+    /// <summary>
+    /// Change user password
+    /// </summary>
+    [HttpPut("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var command = new ChangePasswordCommand(userId, changePasswordDto.CurrentPassword, changePasswordDto.NewPassword);
+        var result = await _mediator.Send(command);
+
+        if (!result)
+        {
+            return BadRequest(new { message = "No se pudo cambiar la contraseña. Verifica que la contraseña actual sea correcta." });
+        }
+
+        return Ok(new { message = "Contraseña actualizada exitosamente" });
+    }
+
+    /// <summary>
+    /// Toggle two-factor authentication
+    /// </summary>
+    [HttpPost("toggle-2fa")]
+    public async Task<IActionResult> Toggle2FA([FromBody] Toggle2FADto toggle2FADto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var command = new Toggle2FACommand(userId, toggle2FADto.Enable);
+        var result = await _mediator.Send(command);
+
+        if (!result)
+        {
+            return BadRequest(new { message = "No se pudo actualizar la configuración de 2FA" });
+        }
+
+        return Ok(new { enabled = toggle2FADto.Enable, message = $"Autenticación de dos factores {(toggle2FADto.Enable ? "activada" : "desactivada")} exitosamente" });
     }
 
     /// <summary>

@@ -110,7 +110,10 @@ export class AuthService {
       firstName: userData?.firstName || response.firstName || '',
       lastName: userData?.lastName || response.lastName || '',
       role: userData?.role || response.role || '',
-      tenantId: response.tenantId || ''
+      tenantId: response.tenantId || '',
+      tenantName: userData?.tenantName || response.tenantName || '',
+      phoneNumber: userData?.phoneNumber || response.phoneNumber || '',
+      createdAt: userData?.createdAt || response.createdAt || ''
     };
     
     this.storageService.setCurrentUser(user);
@@ -121,7 +124,10 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      lastLogin: new Date()
+      lastLogin: new Date(),
+      tenantName: user.tenantName,
+      phoneNumber: user.phoneNumber,
+      createdAt: user.createdAt ? new Date(user.createdAt) : new Date()
     };
     this.storageService.saveAccount(savedAccount);
   }

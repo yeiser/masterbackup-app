@@ -27,6 +27,9 @@ export interface AuthResponse {
   lastName?: string;
   role?: string;
   tenantId?: string;
+  tenantName?: string;
+  phoneNumber?: string;
+  createdAt?: string;
   twoFactorRequired?: boolean;
   requiresTwoFactor?: boolean;
   user?: {
@@ -35,6 +38,9 @@ export interface AuthResponse {
     firstName: string;
     lastName: string;
     role: string;
+    tenantName?: string;
+    phoneNumber?: string;
+    createdAt?: string;
   };
 }
 
@@ -60,4 +66,7 @@ export interface SavedAccount {
   lastName?: string;
   lastLogin: Date;
   avatar?: string;
+  tenantName?: string;
+  phoneNumber?: string;
+  createdAt?: Date;
 }

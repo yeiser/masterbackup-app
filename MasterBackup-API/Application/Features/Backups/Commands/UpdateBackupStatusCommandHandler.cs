@@ -2,6 +2,8 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MasterBackup_API.Application.Common.Interfaces;
+using MasterBackup_API.Application.Common.DTOs;
+using MasterBackup_API.Domain.Entities;
 using MasterBackup_API.Domain.Enums;
 using MasterBackup_API.Infrastructure.Persistence;
 using System.Text.Json;
@@ -186,8 +188,14 @@ public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStat
             _logger.LogWarning(ex, "Failed to send completion notification for Job {JobId}", request.JobId);
         }
 
+        // Ensure related entities are loaded before sending notifications
+        await EnsureRelatedEntitiesLoadedAsync(backupHistory, cancellationToken);
+
         // Send email notification if configured
         await SendEmailNotificationAsync(backupHistory, request, isSuccess: true, cancellationToken);
+
+        // Create in-app notification for backup completion
+        await CreateBackupNotificationAsync(backupHistory, request, isSuccess: true, cancellationToken); 
     }
 
     private async Task HandleFailedStatus(
@@ -237,8 +245,14 @@ public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStat
             _logger.LogWarning(ex, "Failed to send failure notification for Job {JobId}", request.JobId);
         }
 
+        // Ensure related entities are loaded before sending notifications
+        await EnsureRelatedEntitiesLoadedAsync(backupHistory, cancellationToken);
+
         // Send email notification if configured
         await SendEmailNotificationAsync(backupHistory, request, isSuccess: false, cancellationToken);
+
+        // Create in-app notification for backup failure
+        await CreateBackupNotificationAsync(backupHistory, request, isSuccess: false, cancellationToken);
     }
 
     private async Task HandleCancelledStatus(
@@ -285,51 +299,69 @@ public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStat
     {
         try
         {
-            // Check if we have a backup schedule with notification settings
+            string userId;
+            string scheduleName;
+            bool shouldNotify = true;
+
+            // Handle instant backups vs scheduled backups differently
             if (backupHistory.BackupSchedule == null)
             {
-                _logger.LogDebug("No BackupSchedule found for Job {JobId}, skipping email notification", request.JobId);
-                return;
-            }
+                // This is an instant backup
+                if (string.IsNullOrEmpty(backupHistory.InitiatedBy))
+                {
+                    _logger.LogWarning("Instant backup Job {JobId} has no InitiatedBy user, skipping email notification", request.JobId);
+                    return;
+                }
 
-            var schedule = backupHistory.BackupSchedule;
-
-            // Apply notification rules based on schedule settings
-            bool shouldNotify = false;
-
-            if (isSuccess)
-            {
-                // For successful backups: only notify if NotifyOnCompletion is true AND NotifyOnlyOnFailure is false
-                shouldNotify = schedule.NotifyOnCompletion && !schedule.NotifyOnlyOnFailure;
+                // For instant backups, always notify the user who initiated it
+                userId = backupHistory.InitiatedBy;
+                scheduleName = "Instant Backup";
+                shouldNotify = true;
+                
+                _logger.LogDebug("Processing email notification for instant backup Job {JobId} initiated by {UserId}", 
+                    request.JobId, userId);
             }
             else
             {
-                // For failed backups: notify if either NotifyOnCompletion OR NotifyOnlyOnFailure is true
-                shouldNotify = schedule.NotifyOnCompletion || schedule.NotifyOnlyOnFailure;
+                // This is a scheduled backup
+                var schedule = backupHistory.BackupSchedule;
+
+                // Apply notification rules based on schedule settings
+                if (isSuccess)
+                {
+                    // For successful backups: only notify if NotifyOnCompletion is true AND NotifyOnlyOnFailure is false
+                    shouldNotify = schedule.NotifyOnCompletion && !schedule.NotifyOnlyOnFailure;
+                }
+                else
+                {
+                    // For failed backups: notify if either NotifyOnCompletion OR NotifyOnlyOnFailure is true
+                    shouldNotify = schedule.NotifyOnCompletion || schedule.NotifyOnlyOnFailure;
+                }
+
+                if (!shouldNotify)
+                {
+                    _logger.LogDebug("Email notification skipped for Job {JobId} based on schedule settings (NotifyOnCompletion={NotifyOnCompletion}, NotifyOnlyOnFailure={NotifyOnlyOnFailure})",
+                        request.JobId, schedule.NotifyOnCompletion, schedule.NotifyOnlyOnFailure);
+                    return;
+                }
+
+                userId = schedule.CreatedBy.ToString();
+                scheduleName = schedule.Name ?? "Unnamed Schedule";
             }
 
-            if (!shouldNotify)
-            {
-                _logger.LogDebug("Email notification skipped for Job {JobId} based on schedule settings (NotifyOnCompletion={NotifyOnCompletion}, NotifyOnlyOnFailure={NotifyOnlyOnFailure})",
-                    request.JobId, schedule.NotifyOnCompletion, schedule.NotifyOnlyOnFailure);
-                return;
-            }
-
-            // Get the user who created the schedule from MasterDbContext
-            var userId = schedule.CreatedBy.ToString();
+            // Get the user from MasterDbContext
             var user = await _masterContext.Users
                 .Where(u => u.Id == userId && u.TenantId == request.TenantId && u.IsActive)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (user == null)
             {
-                _logger.LogWarning("User not found for schedule creator {CreatedBy}, TenantId {TenantId}. Cannot send email notification.",
-                    schedule.CreatedBy, request.TenantId);
+                _logger.LogWarning("User {UserId} not found or inactive in Tenant {TenantId}. Cannot send email notification.",
+                    userId, request.TenantId);
                 return;
             }
 
             // Prepare email data
-            var scheduleName = schedule.Name ?? "Unnamed Schedule";
             var databaseName = backupHistory.DatabaseConnection?.Name ?? backupHistory.DatabaseConnection?.Database ?? "Unknown Database";
             var recipientName = $"{user.FirstName} {user.LastName}";
 
@@ -378,7 +410,6 @@ public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStat
                 request.JobId);
         }
     }
-
     private TimeSpan? CalculateEstimatedTimeRemaining(DateTime startTime, int progressPercentage)
     {
         if (progressPercentage <= 0) return null;
@@ -388,5 +419,158 @@ public class UpdateBackupStatusCommandHandler : IRequestHandler<UpdateBackupStat
         var remaining = totalEstimated - elapsed.TotalSeconds;
 
         return TimeSpan.FromSeconds(Math.Max(0, remaining));
+    }
+
+    private async Task EnsureRelatedEntitiesLoadedAsync(
+        Domain.Entities.BackupHistory backupHistory,
+        CancellationToken cancellationToken)
+    {
+        // Load BackupSchedule if not loaded and BackupScheduleId exists
+        if (backupHistory.BackupSchedule == null && backupHistory.BackupScheduleId.HasValue)
+        {
+            await _tenantContext.Entry(backupHistory)
+                .Reference(bh => bh.BackupSchedule)
+                .LoadAsync(cancellationToken);
+        }
+    }
+    private async Task CreateBackupNotificationAsync(
+        Domain.Entities.BackupHistory backupHistory,
+        UpdateBackupStatusCommand request,
+        bool isSuccess,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            string userId;
+            string scheduleName;
+            bool shouldNotify = true;
+
+            // Handle instant backups vs scheduled backups differently
+            if (backupHistory.BackupSchedule == null)
+            {
+                // This is an instant backup
+                if (string.IsNullOrEmpty(backupHistory.InitiatedBy))
+                {
+                    _logger.LogWarning("Instant backup Job {JobId} has no InitiatedBy user, skipping notification", request.JobId);
+                    return;
+                }
+
+                // For instant backups, always notify the user who initiated it
+                userId = backupHistory.InitiatedBy;
+                scheduleName = "Instant Backup";
+                shouldNotify = true;
+                
+                _logger.LogDebug("Processing notification for instant backup Job {JobId} initiated by {UserId}", 
+                    request.JobId, userId);
+            }
+            else
+            {
+                // This is a scheduled backup
+                var schedule = backupHistory.BackupSchedule;
+
+                // Apply notification rules
+                if (isSuccess)
+                {
+                    shouldNotify = schedule.NotifyOnCompletion && !schedule.NotifyOnlyOnFailure;
+                }
+                else
+                {
+                    shouldNotify = schedule.NotifyOnCompletion || schedule.NotifyOnlyOnFailure;
+                }
+
+                if (!shouldNotify)
+                {
+                    _logger.LogDebug("Notification skipped for Job {JobId} based on schedule settings", request.JobId);
+                    return;
+                }
+
+                userId = schedule.CreatedBy.ToString();
+                scheduleName = schedule.Name ?? "Unnamed Schedule";
+            }
+
+            // Get the user from MasterDbContext
+            var user = await _masterContext.Users
+                .Where(u => u.Id == userId && u.TenantId == request.TenantId && u.IsActive)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (user == null)
+            {
+                _logger.LogWarning("User {UserId} not found or inactive in Tenant {TenantId}. Cannot create notification.",
+                    userId, request.TenantId);
+                return;
+            }
+
+            var databaseName = backupHistory.DatabaseConnection?.Name ?? backupHistory.DatabaseConnection?.Database ?? "Unknown Database";
+
+            // Create notification
+            var notification = new Notification
+            {
+                Id = Guid.NewGuid(),
+                TenantId = request.TenantId,
+                UserId = user.Id,
+                Type = isSuccess ? NotificationType.BackupCompleted.ToString() : NotificationType.BackupFailed.ToString(),
+                Title = isSuccess 
+                    ? $"Backup completado" 
+                    : $"Backup fallido",
+                Message = isSuccess
+                    ? $"El backup de '{scheduleName}' se completó exitosamente. Tamaño: {backupHistory.BackupSizeMB:F2} MB"
+                    : $"El backup de '{scheduleName}' falló. Error: {request.ErrorMessage}",
+                RedirectUrl = $"/activity",
+                RelatedEntityId = backupHistory.Id,
+                RelatedEntityType = "BackupHistory",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(30),
+                Metadata = JsonSerializer.Serialize(new
+                {
+                    jobId = request.JobId,
+                    scheduleId = backupHistory.BackupScheduleId,
+                    databaseName,
+                    scheduleName,
+                    backupSizeMB = backupHistory.BackupSizeMB,
+                    duration = backupHistory.Duration?.ToString(),
+                    blobUrl = request.BlobUrl,
+                    errorMessage = request.ErrorMessage
+                })
+            };
+
+            _tenantContext.Notifications.Add(notification);
+            await _tenantContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Notification created for user {UserId} for Job {JobId}", user.Id, request.JobId);
+
+            // Send SignalR notification directly to the specific user
+            try
+            {
+                var notificationDto = new
+                {
+                    id = notification.Id,
+                    userId = notification.UserId,
+                    type = notification.Type,
+                    title = notification.Title,
+                    message = notification.Message,
+                    redirectUrl = notification.RedirectUrl,
+                    isRead = notification.IsRead,
+                    createdAt = notification.CreatedAt,
+                    expiresAt = notification.ExpiresAt
+                };
+
+                await _notificationService.NotifyUserByStringIdAsync(
+                    notification.UserId,
+                    "NewNotification",
+                    notificationDto
+                );
+
+                _logger.LogInformation("SignalR notification sent to user {UserId}", notification.UserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send SignalR notification for new notification");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create notification for Job {JobId}", request.JobId);
+        }
     }
 }

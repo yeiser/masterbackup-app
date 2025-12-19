@@ -15,6 +15,9 @@ public class AuthResponseDto
     public string? LastName { get; set; }
     public string? Role { get; set; }
     public string? TenantId { get; set; }
+    public string? TenantName { get; set; }
+    public string? PhoneNumber { get; set; }
+    public DateTime? CreatedAt { get; set; }
     public string? ApiKey { get; set; }
     
     public UserDto? User { get; set; }
@@ -27,4 +30,7 @@ public class UserDto
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
+    public string? TenantName { get; set; }
+    public string? PhoneNumber { get; set; }
+    public DateTime? CreatedAt { get; set; }
 }

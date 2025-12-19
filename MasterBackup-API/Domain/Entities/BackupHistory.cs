@@ -107,6 +107,11 @@ public class BackupHistory
     public bool IsInstantBackup { get; set; }
     
     /// <summary>
+    /// User ID who initiated the backup (for instant backups)
+    /// </summary>
+    public string? InitiatedBy { get; set; }
+    
+    /// <summary>
     /// Timestamp of record creation
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

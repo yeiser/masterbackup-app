@@ -1,0 +1,47 @@
+/* Profile Component Styles */
+
+.avatar-upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  cursor: pointer;
+  border-radius: 0.475rem;
+}
+
+.symbol:hover .avatar-upload-overlay {
+  opacity: 1;
+}
+
+.tab-custom {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab-custom:hover {
+  background-color: #f5f8fa;
+}
+
+.tab-custom.active {
+  background-color: #009ef7;
+  color: white !important;
+}
+
+.tab-custom.active .svg-icon {
+  color: white !important;
+}
+
+.stats-card {
+  transition: transform 0.2s ease;
+}
+
+.stats-card:hover {
+  transform: translateY(-5px);
+}

@@ -1,0 +1,212 @@
+<!-- Verificación de contraseña -->
+<div class="card mb-5 mb-xl-10" *ngIf="!isVerified">
+  <div class="card-header border-0 cursor-pointer">
+    <div class="card-title m-0">
+      <h3 class="fw-bold m-0">Verificación de Seguridad</h3>
+    </div>
+  </div>
+  <div class="card-body border-top p-9">
+    <div class="alert alert-info d-flex align-items-center p-5 mb-7">
+      <i class="fas fa-shield-alt fs-2x text-info me-4"></i>
+      <div class="d-flex flex-column">
+        <h5 class="mb-1">Verificación requerida</h5>
+        <span>Por seguridad, ingresa tu contraseña actual para acceder a la configuración de seguridad</span>
+      </div>
+    </div>
+
+    <form [formGroup]="verifyPasswordForm" (ngSubmit)="verifyCurrentPassword()">
+      <div class="row mb-6">
+        <label class="col-lg-4 col-form-label required fw-bold fs-6">Contraseña Actual</label>
+        <div class="col-lg-8">
+          <div class="input-group">
+            <input 
+              [type]="showCurrentPassword ? 'text' : 'password'"
+              formControlName="currentPassword"
+              class="form-control form-control-solid" 
+              placeholder="Ingresa tu contraseña actual"
+              [class.is-invalid]="verifyPasswordForm.get('currentPassword')?.invalid && verifyPasswordForm.get('currentPassword')?.touched"
+            />
+            <button 
+              class="btn btn-light-primary" 
+              type="button"
+              (click)="showCurrentPassword = !showCurrentPassword"
+            >
+              <i [class]="showCurrentPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+            </button>
+          </div>
+          <div class="invalid-feedback d-block" *ngIf="verifyPasswordForm.get('currentPassword')?.invalid && verifyPasswordForm.get('currentPassword')?.touched">
+            La contraseña es requerida
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer d-flex justify-content-end py-6 px-9">
+        <button 
+          type="submit" 
+          class="btn btn-primary"
+          [disabled]="isVerifying || verifyPasswordForm.invalid"
+        >
+          <span *ngIf="!isVerifying">
+            <i class="fas fa-check me-2"></i>Verificar
+          </span>
+          <span *ngIf="isVerifying">
+            <span class="spinner-border spinner-border-sm me-2"></span>Verificando...
+          </span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Configuración de Seguridad (visible después de verificar) -->
+<div *ngIf="isVerified" class="row g-5">
+  <!-- Cambiar Contraseña -->
+  <div class="col-xl-6">
+    <div class="card mb-5 mb-xl-10 h-100">
+      <div class="card-header border-0 cursor-pointer">
+        <div class="card-title m-0">
+          <h3 class="fw-bold m-0">Cambiar Contraseña</h3>
+        </div>
+      </div>
+      <div class="card-body border-top p-9">
+      <div class="alert alert-warning d-flex align-items-center p-5 mb-7">
+        <i class="fas fa-exclamation-triangle fs-2x text-warning me-4"></i>
+        <div class="d-flex flex-column">
+          <span>Asegúrate de usar una contraseña segura con al menos 6 caracteres</span>
+        </div>
+      </div>
+
+      <form [formGroup]="changePasswordForm" (ngSubmit)="changePassword()">
+        <div class="row mb-6">
+          <label class="col-lg-4 col-form-label required fw-bold fs-6">Nueva Contraseña</label>
+          <div class="col-lg-8">
+            <div class="input-group">
+              <input 
+                [type]="showNewPassword ? 'text' : 'password'"
+                formControlName="newPassword"
+                class="form-control form-control-solid" 
+                placeholder="Ingresa tu nueva contraseña"
+                [class.is-invalid]="changePasswordForm.get('newPassword')?.invalid && changePasswordForm.get('newPassword')?.touched"
+              />
+              <button 
+                class="btn btn-light-primary" 
+                type="button"
+                (click)="showNewPassword = !showNewPassword"
+              >
+                <i [class]="showNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+              </button>
+            </div>
+            <div class="invalid-feedback d-block" *ngIf="changePasswordForm.get('newPassword')?.invalid && changePasswordForm.get('newPassword')?.touched">
+              <span *ngIf="changePasswordForm.get('newPassword')?.errors?.['required']">La nueva contraseña es requerida</span>
+              <span *ngIf="changePasswordForm.get('newPassword')?.errors?.['minlength']">La contraseña debe tener al menos 6 caracteres</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row mb-6">
+          <label class="col-lg-4 col-form-label required fw-bold fs-6">Confirmar Contraseña</label>
+          <div class="col-lg-8">
+            <div class="input-group">
+              <input 
+                [type]="showConfirmPassword ? 'text' : 'password'"
+                formControlName="confirmPassword"
+                class="form-control form-control-solid" 
+                placeholder="Confirma tu nueva contraseña"
+                [class.is-invalid]="changePasswordForm.get('confirmPassword')?.invalid && changePasswordForm.get('confirmPassword')?.touched"
+              />
+              <button 
+                class="btn btn-light-primary" 
+                type="button"
+                (click)="showConfirmPassword = !showConfirmPassword"
+              >
+                <i [class]="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+              </button>
+            </div>
+            <div class="invalid-feedback d-block" *ngIf="changePasswordForm.get('confirmPassword')?.invalid && changePasswordForm.get('confirmPassword')?.touched">
+              <span *ngIf="changePasswordForm.get('confirmPassword')?.errors?.['required']">La confirmación es requerida</span>
+              <span *ngIf="changePasswordForm.get('confirmPassword')?.errors?.['passwordMismatch']">Las contraseñas no coinciden</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-footer d-flex justify-content-end py-6 px-9">
+          <button 
+            type="button" 
+            class="btn btn-light me-3"
+            (click)="changePasswordForm.reset(); changePasswordForm.patchValue({ currentPassword: verifyPasswordForm.get('currentPassword')?.value })"
+            [disabled]="isChangingPassword"
+          >
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            class="btn btn-primary"
+            [disabled]="isChangingPassword || changePasswordForm.invalid"
+          >
+            <span *ngIf="!isChangingPassword">
+              <i class="fas fa-key me-2"></i>Cambiar Contraseña
+            </span>
+            <span *ngIf="isChangingPassword">
+              <span class="spinner-border spinner-border-sm me-2"></span>Cambiando...
+            </span>
+          </button>
+        </div>
+      </form>
+    </div>
+    </div>
+  </div>
+
+  <!-- Autenticación de Dos Factores -->
+  <div class="col-xl-6">
+    <div class="card mb-5 mb-xl-10 h-100">
+      <div class="card-header border-0 cursor-pointer">
+        <div class="card-title m-0">
+          <h3 class="fw-bold m-0">Autenticación de Dos Factores (2FA)</h3>
+        </div>
+      </div>
+      <div class="card-body border-top p-9">
+      <div class="d-flex align-items-center mb-7">
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center mb-2">
+            <i class="fas fa-mobile-alt fs-2x text-primary me-4"></i>
+            <div>
+              <h5 class="mb-0">Estado Actual</h5>
+              <span class="badge fs-7 mt-1" [ngClass]="twoFactorEnabled ? 'badge-light-success' : 'badge-light-danger'">
+                {{ twoFactorEnabled ? 'Activado' : 'Desactivado' }}
+              </span>
+            </div>
+          </div>
+          <p class="text-muted mb-0">
+            La autenticación de dos factores añade una capa adicional de seguridad a tu cuenta.
+            {{ twoFactorEnabled ? 'Se te solicitará un código cada vez que inicies sesión.' : 'Te recomendamos activarla para mayor seguridad.' }}
+          </p>
+        </div>
+      </div>
+
+      <div class="separator separator-dashed mb-7"></div>
+
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="mb-1">{{ twoFactorEnabled ? 'Desactivar' : 'Activar' }} Autenticación de Dos Factores</h6>
+          <p class="text-muted mb-0 fs-7">{{ twoFactorEnabled ? 'Tu cuenta será menos segura' : 'Recomendado para mayor seguridad' }}</p>
+        </div>
+        <button 
+          type="button" 
+          class="btn"
+          [ngClass]="twoFactorEnabled ? 'btn-light-danger' : 'btn-light-success'"
+          (click)="toggle2FA()"
+          [disabled]="isToggling2FA"
+        >
+          <span *ngIf="!isToggling2FA">
+            <i [class]="twoFactorEnabled ? 'fas fa-times me-2' : 'fas fa-check me-2'"></i>
+            {{ twoFactorEnabled ? 'Desactivar' : 'Activar' }}
+          </span>
+          <span *ngIf="isToggling2FA">
+            <span class="spinner-border spinner-border-sm me-2"></span>Procesando...
+          </span>
+        </button>
+      </div>
+    </div>
+    </div>
+  </div>
+</div>

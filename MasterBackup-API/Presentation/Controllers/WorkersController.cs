@@ -83,6 +83,9 @@ public class WorkersController : ControllerBase
     {
         try
         {
+            _logger.LogInformation("Heartbeat recibido del worker {WorkerId} - Estado: {Status}, Jobs activos: {ActiveJobs}", 
+                dto.WorkerId, dto.Status, dto.CurrentActiveJobs);
+
             var command = new UpdateWorkerHeartbeatCommand
             {
                 WorkerId = dto.WorkerId,

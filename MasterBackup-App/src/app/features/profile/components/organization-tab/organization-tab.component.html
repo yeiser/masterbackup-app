@@ -1,0 +1,328 @@
+<!--begin::details View-->
+<div class="card mb-5 mb-xl-10" id="kt_profile_organization_view">
+  <!--begin::Card header-->
+  <div class="card-header cursor-pointer">
+    <!--begin::Card title-->
+    <div class="card-title m-0">
+      <h3 class="fw-bolder m-0">Organización</h3>
+    </div>
+    <!--end::Card title-->
+    <!--begin::Action-->
+    <button
+      type="button"
+      class="btn btn-primary align-self-center"
+      (click)="openEditModal()"
+    >
+      <i class="fas fa-edit me-2"></i>Editar
+    </button>
+    <!--end::Action-->
+  </div>
+  <!--begin::Card header-->
+  <!--begin::Card body-->
+  <div class="card-body p-9">
+    <!--begin::Row-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Nombre de la Organización</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="fw-bolder fs-6 text-gray-800">{{ tenant?.name }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Row-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Tipo de Identificación</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8 fv-row">
+        <span class="fw-bold text-gray-800 fs-6">{{ getTipoIdLabel(tenant?.tipoId) }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Número de Identificación</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="fw-bolder fs-6 text-gray-800">{{ tenant?.identificacion || 'No registrado' }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Dirección</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="fw-bold fs-6 text-gray-800">{{ tenant?.direccion || 'No registrada' }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Teléfono</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8 d-flex align-items-center">
+        <span class="fw-bolder fs-6 text-gray-800 me-2">{{ tenant?.telefono || 'No registrado' }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Email Corporativo</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="fw-bold fs-6 text-gray-800">{{ tenant?.email || 'No registrado' }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Página Web</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <a 
+          *ngIf="tenant?.paginaWeb" 
+          [href]="tenant?.paginaWeb" 
+          target="_blank"
+          class="fw-bold fs-6 text-primary text-hover-primary"
+        >
+          {{ tenant?.paginaWeb }}
+          <i class="fas fa-external-link-alt ms-1 fs-7"></i>
+        </a>
+        <span *ngIf="!tenant?.paginaWeb" class="fw-bold fs-6 text-gray-800">No registrada</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7" *ngIf="tenant?.createdAt">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Fecha de Creación</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="fw-bold fs-6 text-gray-800">{{ tenant?.createdAt | date:'dd/MM/yyyy' }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Estado</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="badge" [ngClass]="tenant?.isActive ? 'badge-light-success' : 'badge-light-danger'">
+          {{ tenant?.isActive ? 'Activo' : 'Inactivo' }}
+        </span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-10">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">ID de la Organización</label>
+      <!--begin::Label-->
+      <!--begin::Label-->
+      <div class="col-lg-8">
+        <span class="fw-bold fs-7 text-gray-600">{{ tenant?.id }}</span>
+      </div>
+      <!--begin::Label-->
+    </div>
+    <!--end::Input group-->
+  </div>
+  <!--end::Card body-->
+</div>
+<!--end::details View-->
+
+<!-- Modal de edición -->
+<div class="modal fade show" [class.d-block]="showModal" [style.display]="showModal ? 'block' : 'none'" 
+     tabindex="-1" aria-modal="true" role="dialog" *ngIf="showModal">
+  <div class="modal-dialog modal-dialog-centered mw-750px">
+    <div class="modal-content">
+      <!--begin::Modal header-->
+      <div class="modal-header" id="kt_modal_edit_tenant_header">
+        <h2 class="fw-bolder">Editar Información de la Organización</h2>
+        <div class="btn btn-icon btn-sm btn-active-icon-primary" (click)="closeModal()">
+          <span class="svg-icon svg-icon-1">
+            <i class="fas fa-times fs-2"></i>
+          </span>
+        </div>
+      </div>
+      <!--end::Modal header-->
+      <!--begin::Modal body-->
+      <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+        <form [formGroup]="editForm" (ngSubmit)="saveChanges()">
+          <div class="row">
+            <!--begin::Input group-->
+            <div class="col-md-12 fv-row mb-7">
+              <label class="required fw-bold fs-6 mb-2">Nombre de la Organización</label>
+              <input 
+                type="text" 
+                formControlName="name"
+                class="form-control form-control-solid" 
+                placeholder="Mi Empresa S.A."
+                [class.is-invalid]="editForm.get('name')?.invalid && editForm.get('name')?.touched"
+              />
+              <div class="invalid-feedback" *ngIf="editForm.get('name')?.invalid && editForm.get('name')?.touched">
+                El nombre es requerido (mínimo 3 caracteres)
+              </div>
+            </div>
+            <!--end::Input group-->
+          </div>
+          
+          <div class="row">
+            <!--begin::Input group-->
+            <div class="col-md-6 fv-row mb-7">
+              <label class="fw-bold fs-6 mb-2">Tipo de Identificación</label>
+              <select 
+                formControlName="tipoId"
+                class="form-select form-select-solid"
+              >
+                <option value="">Seleccione...</option>
+                <option *ngFor="let tipo of tiposId" [value]="tipo.value">{{ tipo.label }}</option>
+              </select>
+            </div>
+            <!--end::Input group-->
+            <!--begin::Input group-->
+            <div class="col-md-6 fv-row mb-7">
+              <label class="fw-bold fs-6 mb-2">Número de Identificación</label>
+              <input 
+                type="text" 
+                formControlName="identificacion"
+                class="form-control form-control-solid" 
+                placeholder="900123456"
+                [class.is-invalid]="editForm.get('identificacion')?.invalid && editForm.get('identificacion')?.touched"
+              />
+              <div class="invalid-feedback" *ngIf="editForm.get('identificacion')?.invalid && editForm.get('identificacion')?.touched">
+                Máximo 20 caracteres
+              </div>
+            </div>
+            <!--end::Input group-->
+          </div>
+
+          <div class="row">
+            <!--begin::Input group-->
+            <div class="col-md-12 fv-row mb-7">
+              <label class="fw-bold fs-6 mb-2">Dirección</label>
+              <input 
+                type="text" 
+                formControlName="direccion"
+                class="form-control form-control-solid" 
+                placeholder="Calle 100 #15-20, Bogotá"
+                [class.is-invalid]="editForm.get('direccion')?.invalid && editForm.get('direccion')?.touched"
+              />
+              <div class="invalid-feedback" *ngIf="editForm.get('direccion')?.invalid && editForm.get('direccion')?.touched">
+                Máximo 50 caracteres
+              </div>
+            </div>
+            <!--end::Input group-->
+          </div>
+
+          <div class="row">
+            <!--begin::Input group-->
+            <div class="col-md-6 fv-row mb-7">
+              <label class="fw-bold fs-6 mb-2">Teléfono</label>
+              <input 
+                type="text" 
+                formControlName="telefono"
+                class="form-control form-control-solid" 
+                placeholder="+57 300 1234567"
+                [class.is-invalid]="editForm.get('telefono')?.invalid && editForm.get('telefono')?.touched"
+              />
+              <div class="invalid-feedback" *ngIf="editForm.get('telefono')?.invalid && editForm.get('telefono')?.touched">
+                Máximo 20 caracteres
+              </div>
+            </div>
+            <!--end::Input group-->
+            <!--begin::Input group-->
+            <div class="col-md-6 fv-row mb-7">
+              <label class="fw-bold fs-6 mb-2">Email Corporativo</label>
+              <input 
+                type="email" 
+                formControlName="email"
+                class="form-control form-control-solid" 
+                placeholder="contacto@empresa.com"
+                [class.is-invalid]="editForm.get('email')?.invalid && editForm.get('email')?.touched"
+              />
+              <div class="invalid-feedback" *ngIf="editForm.get('email')?.invalid && editForm.get('email')?.touched">
+                Email inválido (máximo 50 caracteres)
+              </div>
+            </div>
+            <!--end::Input group-->
+          </div>
+
+          <div class="row">
+            <!--begin::Input group-->
+            <div class="col-md-12 fv-row mb-7">
+              <label class="fw-bold fs-6 mb-2">Página Web</label>
+              <input 
+                type="url" 
+                formControlName="paginaWeb"
+                class="form-control form-control-solid" 
+                placeholder="https://www.empresa.com"
+                [class.is-invalid]="editForm.get('paginaWeb')?.invalid && editForm.get('paginaWeb')?.touched"
+              />
+              <div class="form-text">Incluye el protocolo (http:// o https://)</div>
+              <div class="invalid-feedback" *ngIf="editForm.get('paginaWeb')?.invalid && editForm.get('paginaWeb')?.touched">
+                Máximo 50 caracteres
+              </div>
+            </div>
+            <!--end::Input group-->
+          </div>
+
+          <!--begin::Actions-->
+          <div class="text-center pt-15">
+            <button 
+              type="button" 
+              class="btn btn-light me-3" 
+              (click)="closeModal()"
+              [disabled]="isLoading"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              class="btn btn-primary"
+              [disabled]="isLoading || editForm.invalid"
+            >
+              <span *ngIf="!isLoading">
+                <i class="fas fa-save me-2"></i>Guardar Cambios
+              </span>
+              <span *ngIf="isLoading">
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                Guardando...
+              </span>
+            </button>
+          </div>
+          <!--end::Actions-->
+        </form>
+      </div>
+      <!--end::Modal body-->
+    </div>
+  </div>
+</div>
+
+<!-- Modal backdrop -->
+<div class="modal-backdrop fade show" *ngIf="showModal" (click)="closeModal()"></div>

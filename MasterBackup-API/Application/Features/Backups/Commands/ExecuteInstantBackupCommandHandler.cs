@@ -83,6 +83,7 @@ public class ExecuteInstantBackupCommandHandler : IRequestHandler<ExecuteInstant
                 Status = BackupStatus.Pending,
                 StartTime = DateTime.UtcNow,
                 IsInstantBackup = true,
+                InitiatedBy = request.InitiatedBy,
                 CompressionType = request.CompressionType ?? "GZIP",
                 RetryCount = 0,
                 CreatedAt = DateTime.UtcNow,

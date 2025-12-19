@@ -1,8 +1,11 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, NavigationEnd } from '@angular/router';
+import { Router, NavigationEnd, RouterLink } from '@angular/router';
 import { StorageService } from '../../../core/services/storage.service';
+import { NotificationsService } from '../../../core/services/notifications.service';
 import { filter } from 'rxjs/operators';
+import { NotificationsComponent } from '../notifications/notifications.component';
+import { CapitalizePipe } from '../../../core/pipes/capitalize.pipe';
 
 interface PageInfo {
   title: string;
@@ -12,12 +15,13 @@ interface PageInfo {
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, NotificationsComponent, RouterLink, CapitalizePipe],
   templateUrl: './header.component.html',
   styleUrl: './header.component.css'
 })
 export class HeaderComponent implements OnInit {
   userName: string = 'Usuario';
+  userEmail: string = '';
   userRole: string = 'Admin';
   currentPageTitle: string = 'Dashboard';
   currentPageIcon: string = 'fa-tachometer-alt';
@@ -42,18 +46,33 @@ export class HeaderComponent implements OnInit {
     '/activity': { 
       title: 'Actividad', 
       icon: 'fa-heartbeat' 
+    },
+    '/notifications': { 
+      title: 'Notificaciones', 
+      icon: 'fa-bell' 
+    },
+    '/profile': { 
+      title: 'Cuenta de usuario', 
+      icon: 'fa-user' 
     }
   };
 
   constructor(
     private router: Router,
-    private storageService: StorageService
+    private storageService: StorageService,
+    private notificationsService: NotificationsService
   ) {}
+
+  // Getter para acceder al signal de notificaciones
+  get unreadCount() {
+    return this.notificationsService.unreadCount;
+  }
 
   ngOnInit(): void {
     const user = this.storageService.getCurrentUser();
     if (user) {
       this.userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Usuario';
+      this.userEmail = user.email || '';
       this.userRole = user.role || 'Admin';
     }
 

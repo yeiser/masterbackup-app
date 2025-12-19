@@ -1,0 +1,388 @@
+<!--begin::Row-->
+<div class="row gy-5 g-xl-8">
+  <!--begin::Col-->
+  <div class="col-xxl-4">
+    <!--begin::Mixed Widget 2-->
+    <div class="card card-xxl-stretch mb-5">
+      <!--begin::Header-->
+      <div class="card-header border-0 bg-danger py-5">
+        <h3 class="card-title fw-bolder text-white">
+          {{ pendingCount + inProgressCount + failedCount + completedCount }}
+          backups ejecutados
+        </h3>
+      </div>
+      <!--end::Header-->
+      <!--begin::Body-->
+      <div class="card-body p-0">
+        <!--begin::Chart-->
+        <div
+          class="card-rounded-bottom bg-danger"
+          data-kt-color="danger"
+          style="height: 200px"
+        >
+          <div id="backup-execution-chart"></div>
+        </div>
+        <!--end::Chart-->
+        <!--begin::Stats-->
+        <div class="card-p mt-n5 position-relative">
+          <!--begin::Row-->
+          <div class="row g-0">
+            <!--begin::Col-->
+            <div class="col bg-warning px-6 py-8 rounded-2 me-7 mb-7">
+              <span class="text-white fw-bold d-block my-2 fs-1">{{
+                pendingCount
+              }}</span>
+              <span class="text-white fw-bold fs-6">Pendientes</span>
+            </div>
+            <!--end::Col-->
+            <!--begin::Col-->
+            <div class="col bg-primary px-6 py-8 rounded-2 mb-7">
+              <span class="text-white fw-bold d-block my-2 fs-1">{{
+                inProgressCount
+              }}</span>
+              <span class="text-white fw-bold fs-6">En progreso</span>
+            </div>
+            <!--end::Col-->
+          </div>
+          <!--end::Row-->
+          <!--begin::Row-->
+          <div class="row g-0">
+            <!--begin::Col-->
+            <div class="col bg-danger px-6 py-8 rounded-2 me-7">
+              <span class="text-white fw-bold d-block my-2 fs-1">{{
+                failedCount
+              }}</span>
+              <span class="text-white fw-bold fs-6">Fallidos</span>
+            </div>
+            <!--end::Col-->
+            <!--begin::Col-->
+            <div class="col bg-success px-6 py-8 rounded-2">
+              <span class="text-white fw-bold d-block my-2 fs-1">{{
+                completedCount
+              }}</span>
+              <span class="text-white fw-bold fs-6">Completados</span>
+            </div>
+            <!--end::Col-->
+          </div>
+          <!--end::Row-->
+        </div>
+        <!--end::Stats-->
+      </div>
+      <!--end::Body-->
+    </div>
+    <!--end::Mixed Widget 2-->
+  </div>
+  <!--end::Col-->
+  <!--begin::Col-->
+  <div class="col-xxl-4">
+    <!--begin::List Widget 5-->
+    <div class="card card-xxl-stretch">
+      <!--begin::Header-->
+      <div class="card-header align-items-center border-0 mt-4">
+        <h3 class="card-title align-items-start flex-column">
+          <span class="fw-bolder mb-2 text-dark">Actividad reciente</span>
+          <span class="text-muted fw-bold fs-7">Últimos 7 backups ejecutados</span>
+        </h3>
+      </div>
+      <!--end::Header-->
+      <!--begin::Body-->
+      <div class="card-body pt-5">
+        <!--begin::Timeline-->
+        <div class="timeline-label">
+          <!--begin::Item-->
+          <div class="timeline-item" *ngFor="let backup of recentBackups">
+            <!--begin::Label-->
+            <div class="timeline-label fw-bolder text-gray-800 fs-6">{{ formatDate(backup.startTime) }}</div>
+            <!--end::Label-->
+            <!--begin::Badge-->
+            <div class="timeline-badge">
+              <i class="fa fa-genderless fs-1" [ngClass]="getStatusIconClass(backup.statusText)"></i>
+            </div>
+            <!--end::Badge-->
+            <!--begin::Text-->
+            <div class="fw-mormal timeline-content text-muted ps-3">
+              {{backup.databaseConnectionName}}
+              <span class="text-muted fs-7">{{
+                    backup.isInstantBackup
+                      ? "Backup Manual"
+                      : "Backup Programado"
+                  }}</span>
+            </div>
+            <!--end::Text-->
+          </div>
+          <!--end::Item-->
+        </div>
+        <!--end::Timeline-->
+      </div>
+      <!--end: Card Body-->
+    </div>
+    <!--end: List Widget 5-->
+  </div>
+  <!--end::Col-->
+  <!--begin::Mixed Widget 4-->
+  <div class="col-xxl-4">
+    <div class="card card-xxl-stretch">
+      <!--begin::Header-->
+      <div class="card-header border-0 py-5">
+        <h3 class="card-title align-items-start flex-column">
+          <span class="card-label fw-bolder fs-3 mb-1"
+            >Uso y Almacenamiento</span
+          >
+          <span class="text-muted fw-bold fs-7" *ngIf="subscriptionInfo">
+            Plan {{ subscriptionInfo.planDisplayName }}
+          </span>
+        </h3>
+      </div>
+      <!--end::Header-->
+      <!--begin::Body-->
+      <div class="card-body d-flex flex-column">
+        <div class="flex-grow-1">
+          <div
+            class="mixed-widget-4-chart"
+            data-kt-chart-color="primary"
+            style="height: 225px"
+          ></div>
+        </div>
+        <div class="pt-5">
+          <div class="text-center" *ngIf="subscriptionInfo">
+            <div class="d-flex justify-content-between mb-3">
+              <span class="text-muted fw-bold fs-7">Almacenamiento Usado</span>
+              <span class="fw-bolder fs-7"
+                >{{ getStorageUsedGB() }} GB / {{ getMaxStorageGB() }} GB</span
+              >
+            </div>
+            <div class="d-flex justify-content-between mb-3">
+              <span class="text-muted fw-bold fs-7">Bases de Datos</span>
+              <span class="fw-bolder fs-7"
+                >{{ subscriptionInfo.usage.databasesCount }} /
+                {{
+                  subscriptionInfo.limits.maxDatabases === -1
+                    ? "Ilimitado"
+                    : subscriptionInfo.limits.maxDatabases
+                }}</span
+              >
+            </div>
+            <div class="d-flex justify-content-between mb-5">
+              <span class="text-muted fw-bold fs-7">Usuarios</span>
+              <span class="fw-bolder fs-7"
+                >{{ subscriptionInfo.usage.usersCount }} /
+                {{
+                  subscriptionInfo.limits.maxUsers === -1
+                    ? "Ilimitado"
+                    : subscriptionInfo.limits.maxUsers
+                }}</span
+              >
+            </div>
+            <div
+              class="alert alert-light-info d-flex align-items-center p-3"
+              *ngIf="storagePercentage > 80"
+            >
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              <span class="fs-7">Estás cerca del límite de almacenamiento</span>
+            </div>
+          </div>
+          <a
+            [routerLink]="['/profile']"
+            [queryParams]="{ tab: 'tenant' }"
+            class="btn btn-primary w-100 py-3"
+            >Ver Suscripción</a
+          >
+        </div>
+      </div>
+      <!--end::Body-->
+    </div>
+  </div>
+  <!--end::Mixed Widget 4-->
+</div>
+<!--end::Row-->
+<!--begin::Row-->
+<div class="row gy-5 g-xl-8">
+  <!--begin::Col-->
+  <div class="col-xxl-6">
+    <!--begin::List Widget 6-->
+    <div class="card card-xl-stretch mb-xl-8">
+      <!--begin::Header-->
+      <div class="card-header border-0">
+        <h3 class="card-title fw-bolder text-dark">Duraciones</h3>
+      </div>
+      <!--end::Header-->
+      <!--begin::Body-->
+      <div class="card-body pt-0">
+        <!--begin::Item-->
+        <div
+          class="d-flex align-items-center bg-light-warning rounded p-5 mb-7"
+        >
+          <!--begin::Icon-->
+          <span class="svg-icon svg-icon-warning me-5">
+            <i class="fas fa-clock fs-2x text-warning"></i>
+          </span>
+          <!--end::Icon-->
+          <!--begin::Title-->
+          <div class="flex-grow-1 me-2">
+            <span class="fw-bolder text-gray-800 fs-6 d-block"
+              >Duración Promedio</span
+            >
+            <span class="text-muted fw-bold d-block fs-7"
+              >Tiempo promedio de backup</span
+            >
+          </div>
+          <!--end::Title-->
+          <!--begin::Lable-->
+          <span class="fw-bolder text-warning py-1 fs-5">{{
+            backupStats?.averageDuration || "N/A"
+          }}</span>
+          <!--end::Lable-->
+        </div>
+        <!--end::Item-->
+        <!--begin::Item-->
+        <div
+          class="d-flex align-items-center bg-light-success rounded p-5 mb-7"
+        >
+          <!--begin::Icon-->
+          <span class="svg-icon svg-icon-success me-5">
+            <i class="fas fa-clock fs-2x text-success"></i>
+          </span>
+          <!--end::Icon-->
+          <!--begin::Title-->
+          <div class="flex-grow-1 me-2">
+            <span class="fw-bolder text-gray-800 fs-6 d-block"
+              >Duración Mínima</span
+            >
+            <span class="text-muted fw-bold d-block fs-7"
+              >Tiempo más rápido registrado</span
+            >
+          </div>
+          <!--end::Title-->
+          <!--begin::Lable-->
+          <span class="fw-bolder text-success py-1 fs-5">{{
+            backupStats?.minDuration || "N/A"
+          }}</span>
+          <!--end::Lable-->
+        </div>
+        <!--end::Item-->
+        <!--begin::Item-->
+        <div class="d-flex align-items-center bg-light-danger rounded p-5 mb-7">
+          <!--begin::Icon-->
+          <span class="svg-icon svg-icon-danger me-5">
+            <i class="fas fa-clock fs-2x text-danger"></i>
+          </span>
+          <!--end::Icon-->
+          <!--begin::Title-->
+          <div class="flex-grow-1 me-2">
+            <span class="fw-bolder text-gray-800 fs-6 d-block"
+              >Duración Máxima</span
+            >
+            <span class="text-muted fw-bold d-block fs-7"
+              >Tiempo más largo registrado</span
+            >
+          </div>
+          <!--end::Title-->
+          <!--begin::Lable-->
+          <span class="fw-bolder text-danger py-1 fs-5">{{
+            backupStats?.maxDuration || "N/A"
+          }}</span>
+          <!--end::Lable-->
+        </div>
+        <!--end::Item-->
+      </div>
+      <!--end::Body-->
+    </div>
+    <!--end::List Widget 6-->
+  </div>
+  <!--end::Col-->
+  <!--begin::Col-->
+  <div class="col-xxl-6">
+    <!--begin::List Widget 6-->
+    <div class="card card-xl-stretch mb-xl-8">
+      <!--begin::Header-->
+      <div class="card-header border-0">
+        <h3 class="card-title fw-bolder text-dark">Últimos resultados</h3>
+      </div>
+      <!--end::Header-->
+      <!--begin::Body-->
+      <div class="card-body pt-0">
+        <!--begin::Item-->
+        <div
+          class="d-flex align-items-center bg-light-success rounded p-5 mb-7"
+        >
+          <!--begin::Icon-->
+          <span class="svg-icon svg-icon-success me-5">
+            <i class="far fa-check-circle fs-2x text-success"></i>
+          </span>
+          <!--end::Icon-->
+          <!--begin::Title-->
+          <div class="flex-grow-1 me-2">
+            <span class="fw-bolder text-gray-800 fs-6 d-block"
+              >Último backup exitoso</span
+            >
+            <span class="text-muted fw-bold d-block fs-7"
+              >Fecha y hora en que se completó</span
+            >
+          </div>
+          <!--end::Title-->
+          <!--begin::Lable-->
+          <span class="fw-bolder text-success py-1 fs-5">{{
+            backupStats?.lastSuccessfulBackup | date : "dd/MM/yyyy HH:mm"
+          }}</span>
+          <!--end::Lable-->
+        </div>
+        <!--end::Item-->
+        <!--begin::Item-->
+        <div class="d-flex align-items-center bg-light-danger rounded p-5 mb-7">
+          <!--begin::Icon-->
+          <span class="svg-icon svg-icon-danger me-5">
+            <i class="far fa-times-circle fs-2x text-danger"></i>
+          </span>
+          <!--end::Icon-->
+          <!--begin::Title-->
+          <div class="flex-grow-1 me-2">
+            <span class="fw-bolder text-gray-800 fs-6 d-block"
+              >Último backup fallido</span
+            >
+            <span class="text-muted fw-bold d-block fs-7"
+              >Fecha y hora en que se completó</span
+            >
+          </div>
+          <!--end::Title-->
+          <!--begin::Lable-->
+          <span class="fw-bolder text-danger py-1 fs-5">{{
+            backupStats?.lastFailedBackup | date : "dd/MM/yyyy HH:mm"
+          }}</span>
+          <!--end::Lable-->
+        </div>
+        <!--end::Item-->
+        <!--begin::Item-->
+        <div
+          class="d-flex align-items-center bg-light-info rounded p-5"
+          *ngIf="backupStats"
+        >
+          <!--begin::Icon-->
+          <span class="svg-icon svg-icon-info me-5">
+            <i class="fas fa-chart-pie fs-2x text-info"></i>
+          </span>
+          <!--end::Icon-->
+          <!--begin::Title-->
+          <div class="flex-grow-1 me-2">
+            <span class="fw-bolder text-gray-800 fs-6 d-block"
+              >Tasa de Éxito</span
+            >
+            <span class="text-muted fw-bold d-block fs-7"
+              >Backups completados exitosamente</span
+            >
+          </div>
+          <!--end::Title-->
+          <!--begin::Lable-->
+          <span class="fw-bolder text-info py-1 fs-5"
+            >{{ backupStats.successRate.toFixed(1) }}%</span
+          >
+          <!--end::Lable-->
+        </div>
+        <!--end::Item-->
+      </div>
+      <!--end::Body-->
+    </div>
+    <!--end::List Widget 6-->
+  </div>
+  <!--end::Col-->
+</div>
+<!--end::Row-->

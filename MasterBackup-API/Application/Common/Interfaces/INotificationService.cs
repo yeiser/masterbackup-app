@@ -68,6 +68,11 @@ public interface INotificationService
     Task NotifyUserAsync(Guid userId, string method, object data);
 
     /// <summary>
+    /// Send notification to specific user by user ID string
+    /// </summary>
+    Task NotifyUserByStringIdAsync(string userId, string method, object data);
+
+    /// <summary>
     /// Send notification to all connected clients
     /// </summary>
     Task NotifyAllAsync(string method, object data);

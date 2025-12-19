@@ -32,15 +32,28 @@ public class TenantMiddleware
                 .Where(t => t.ApiKey == apiKey && t.IsActive)
                 .FirstOrDefaultAsync();
 
+            var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+            var endpoint = $"{context.Request.Path}{context.Request.QueryString}";
+            var method = context.Request.Method;
+
             if (tenant != null)
             {
                 tenantId = tenant.Id;
                 connectionString = tenant.ConnectionString;
                 _logger.LogInformation("Tenant resolved from API Key: {TenantId}", tenantId);
+
+                // Registrar log exitoso solo si NO es un heartbeat
+                if (!endpoint.Contains("/heartbeat", StringComparison.OrdinalIgnoreCase))
+                {
+                    await LogApiKeyUsageAsync(masterDbContext, tenant.Id, remoteIp, true, null, endpoint, method);
+                }
             }
             else
             {
                 _logger.LogWarning("Invalid API Key provided: {ApiKey}", apiKey.Substring(0, Math.Min(8, apiKey.Length)));
+
+                // Registrar log fallido (sin tenantId válido, usar Guid.Empty)
+                await LogApiKeyUsageAsync(masterDbContext, Guid.Empty, remoteIp, false, "Invalid API Key", endpoint, method);
             }
         }
         // 2. Try to resolve tenant from JWT token
@@ -144,6 +157,41 @@ public class TenantMiddleware
         else
         {
             _migrationsApplied.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Registrar uso de API key en la tabla de logs
+    /// </summary>
+    private async Task LogApiKeyUsageAsync(
+        MasterDbContext masterDbContext,
+        Guid tenantId,
+        string remoteIp,
+        bool success,
+        string? errorMessage,
+        string? endpoint,
+        string? method)
+    {
+        try
+        {
+            var log = new Domain.Entities.ApiKeyLog
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                RemoteIp = remoteIp,
+                Success = success,
+                ErrorMessage = errorMessage,
+                Endpoint = endpoint,
+                Method = method,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            masterDbContext.ApiKeyLogs.Add(log);
+            await masterDbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al registrar log de API key para tenant {TenantId}", tenantId);
         }
     }
 

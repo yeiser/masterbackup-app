@@ -24,6 +24,11 @@ public class BackupNotificationHub : Hub
     {
         var tenantId = GetTenantId();
         var userId = GetUserId();
+        var userIdString = GetUserIdString();
+
+        _logger.LogInformation(
+            "New SignalR connection attempt. ConnectionId: {ConnectionId}, UserId: {UserId}, UserIdString: {UserIdString}, TenantId: {TenantId}",
+            Context.ConnectionId, userId, userIdString, tenantId);
 
         if (tenantId != Guid.Empty)
         {
@@ -38,6 +43,22 @@ public class BackupNotificationHub : Hub
         {
             _logger.LogWarning(
                 "Client connected without tenant information. ConnectionId: {ConnectionId}",
+                Context.ConnectionId);
+        }
+
+        // Add connection to user-specific group for individual notifications
+        if (!string.IsNullOrEmpty(userIdString))
+        {
+            var userGroupName = $"user_{userIdString}";
+            await Groups.AddToGroupAsync(Context.ConnectionId, userGroupName);
+            _logger.LogInformation(
+                "✓ Client added to user group. ConnectionId: {ConnectionId}, UserGroup: {UserGroup}",
+                Context.ConnectionId, userGroupName);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "⚠ Client connected without user ID. ConnectionId: {ConnectionId}",
                 Context.ConnectionId);
         }
 
@@ -145,5 +166,13 @@ public class BackupNotificationHub : Hub
         }
 
         return Guid.Empty;
+    }
+
+    /// <summary>
+    /// Extract user ID as string from JWT claims (for grouping)
+    /// </summary>
+    private string GetUserIdString()
+    {
+        return Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
     }
 }

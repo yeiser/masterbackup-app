@@ -1,0 +1,174 @@
+<!-- API Key Section -->
+<div class="card mb-5 mb-xl-10">
+  <div class="card-header border-0 cursor-pointer">
+    <div class="card-title m-0">
+      <h3 class="fw-bold m-0">API Key</h3>
+    </div>
+  </div>
+  <div class="card-body border-top p-9">
+    <div class="alert alert-warning d-flex align-items-center p-5 mb-7">
+      <i class="fas fa-info-circle fs-2x text-warning me-4"></i>
+      <div class="d-flex flex-column">
+        <span>Esta es tu API Key única para autenticación. No la compartas con nadie y mantenla segura.</span>
+      </div>
+    </div>
+
+    <div *ngIf="isLoadingKey" class="text-center py-5">
+      <span class="spinner-border spinner-border-lg text-primary"></span>
+      <p class="text-muted mt-3">Cargando API Key...</p>
+    </div>
+
+    <div *ngIf="!isLoadingKey && apiKey" class="mb-7">
+      <label class="form-label fw-bold fs-6 mb-2">Tu API Key</label>
+      <div class="input-group">
+        <input 
+          type="text" 
+          class="form-control form-control-solid font-monospace" 
+          [value]="showApiKey ? apiKey : getMaskedApiKey()"
+          readonly
+        />
+        <button 
+          class="btn" 
+          type="button"
+          (click)="toggleApiKeyVisibility()"
+          title="Mostrar/Ocultar"
+        >
+          <i [class]="showApiKey ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+        </button>
+        <button 
+          class="btn" 
+          type="button"
+          (click)="copyApiKey()"
+          title="Copiar al portapapeles"
+        >
+          <i class="fas fa-copy me-2"></i>
+        </button>
+      </div>
+      <div class="form-text">Usa esta clave para autenticarte en las peticiones a la API</div>
+    </div>
+  </div>
+</div>
+
+<!-- Connection Logs Section -->
+<div class="card mb-5 mb-xl-10">
+  <div class="card-header border-0 cursor-pointer">
+    <div class="card-title m-0">
+      <h3 class="fw-bold m-0">Historial de Conexiones</h3>
+    </div>
+    <div class="card-toolbar">
+      <button 
+        class="btn btn-sm btn-light-primary"
+        (click)="refreshLogs()"
+        [disabled]="isLoadingLogs"
+      >
+        <i class="fas fa-sync-alt me-2"></i>Actualizar
+      </button>
+    </div>
+  </div>
+  <div class="card-body border-top p-9">
+    <div *ngIf="isLoadingLogs" class="text-center py-10">
+      <span class="spinner-border spinner-border-lg text-primary"></span>
+      <p class="text-muted mt-3">Cargando historial...</p>
+    </div>
+
+    <div *ngIf="!isLoadingLogs && logs.length === 0" class="text-center py-10">
+      <i class="fas fa-database fs-3x text-muted mb-3"></i>
+      <p class="text-muted">No hay conexiones registradas</p>
+    </div>
+
+    <div *ngIf="!isLoadingLogs && logs.length > 0" class="table-responsive">
+      <table class="table table-row-gray-100 align-middle gs-0 gy-3">
+        <thead>
+          <tr class="fw-bold text-muted">
+            <th class="min-w-120px">Fecha y Hora</th>
+            <th class="min-w-120px">IP Remota</th>
+            <th class="min-w-100px">Estado</th>
+            <th class="min-w-100px">Método</th>
+            <th class="min-w-150px">Endpoint</th>
+            <th class="min-w-150px">Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let log of logs">
+            <td>
+              <span class="text-gray-800 fw-bold d-block fs-7">
+                {{ log.createdAt | date:'dd/MM/yyyy' }}
+              </span>
+              <span class="text-muted fw-semibold d-block fs-8">
+                {{ log.createdAt | date:'HH:mm:ss' }}
+              </span>
+            </td>
+            <td>
+              <span class="text-gray-800 fw-bold font-monospace fs-7">{{ log.remoteIp }}</span>
+            </td>
+            <td>
+              <span 
+                class="badge fs-7"
+                [ngClass]="log.success ? 'badge-light-success' : 'badge-light-danger'"
+              >
+                {{ log.success ? 'Exitoso' : 'Fallido' }}
+              </span>
+            </td>
+            <td>
+              <span 
+                class="badge badge-light-info fs-7"
+                *ngIf="log.method"
+              >
+                {{ log.method }}
+              </span>
+              <span class="text-muted" *ngIf="!log.method">-</span>
+            </td>
+            <td>
+              <span class="text-gray-800 fs-7 font-monospace" *ngIf="log.endpoint">
+                {{ log.endpoint }}
+              </span>
+              <span class="text-muted" *ngIf="!log.endpoint">-</span>
+            </td>
+            <td>
+              <span 
+                class="text-danger fs-7" 
+                *ngIf="!log.success && log.errorMessage"
+                [title]="log.errorMessage"
+              >
+                {{ log.errorMessage.length > 30 ? (log.errorMessage | slice:0:30) + '...' : log.errorMessage }}
+              </span>
+              <span class="text-muted" *ngIf="log.success || !log.errorMessage">-</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Load More Button -->
+    <div 
+      *ngIf="!isLoadingLogs && logs.length > 0 && hasMore" 
+      class="text-center py-5 border-top"
+    >
+      <button 
+        class="btn text-hover-primary"
+        (click)="loadMore()"
+        [disabled]="isLoadingMore"
+      >
+        <span *ngIf="!isLoadingMore">
+          <i class="fas fa-chevron-down me-2"></i>Cargar más
+        </span>
+        <span *ngIf="isLoadingMore">
+          <span class="spinner-border spinner-border-sm me-2"></span>Cargando...
+        </span>
+      </button>
+      <p class="text-muted mt-2 mb-0 fs-7">
+        Mostrando {{ logs.length }} de {{ totalCount }} registros
+      </p>
+    </div>
+
+    <!-- Footer Info -->
+    <div 
+      *ngIf="!isLoadingLogs && logs.length > 0 && !hasMore" 
+      class="text-center py-3 border-top"
+    >
+      <p class="text-muted mb-0 fs-7">
+        Mostrando todos los registros ({{ totalCount }})
+      </p>
+    </div>
+  </div>
+</div>

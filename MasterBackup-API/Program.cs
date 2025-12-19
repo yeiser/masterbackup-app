@@ -97,14 +97,19 @@ try
         Log.Information("Serilog configured successfully");
     });
 
-// Add CORS
+// Add CORS - Configuración especial para SignalR
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", builder =>
+    options.AddPolicy("AllowAll", corsBuilder =>
     {
-        builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader();
+        corsBuilder.WithOrigins(
+                "http://localhost:4200",
+                "http://localhost:7000",
+                "https://localhost:7001"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials(); // Requerido para SignalR
     });
 });
 
@@ -161,6 +166,26 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtAudience,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
     };
+    
+    // Configuración especial para SignalR
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            
+            // Si la petición es para SignalR y tiene token en query string
+            if (!string.IsNullOrEmpty(accessToken) && 
+                (path.StartsWithSegments("/notificationHub") || 
+                 path.StartsWithSegments("/hubs")))
+            {
+                context.Token = accessToken;
+            }
+            
+            return Task.CompletedTask;
+        }
+    };
 });
 
 // Add HttpClient for Maileroo
@@ -197,8 +222,7 @@ builder.Services.AddSignalR();
 // Add Quartz.NET for backup scheduling
 builder.Services.AddQuartz(q =>
 {
-    // Use Microsoft DI for job creation
-    q.UseMicrosoftDependencyInjectionJobFactory();
+    // Microsoft DI is now the default, no need to explicitly call UseMicrosoftDependencyInjectionJobFactory()
     
     // Configure JSON serialization for JobDataMap
     q.UseSimpleTypeLoader();
@@ -286,14 +310,21 @@ app.UseMiddleware<TenantMiddleware>();
 
 app.MapControllers();
 
-// Map SignalR Hub
+// Map SignalR Hubs
 app.MapHub<MasterBackup_API.Infrastructure.Hubs.BackupNotificationHub>("/hubs/backup-notifications");
+app.MapHub<MasterBackup_API.Infrastructure.Hubs.BackupNotificationHub>("/notificationHub"); // Alias para el frontend
 
-// Ensure Master Database is created
+// Ensure Master Database is created and seed data
 using (var scope = app.Services.CreateScope())
 {
     var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
     await masterDb.Database.MigrateAsync();
+    
+    // Seed plans if not exist
+    await MasterBackup_API.Infrastructure.Data.PlanSeeder.SeedPlansAsync(masterDb);
+    
+    // Seed free subscriptions for existing tenants
+    await MasterBackup_API.Infrastructure.Data.SubscriptionSeeder.SeedFreeSubscriptionsAsync(masterDb);
 }
 
     app.Run();

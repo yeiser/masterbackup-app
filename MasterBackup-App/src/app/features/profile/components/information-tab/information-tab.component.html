@@ -1,0 +1,244 @@
+<!--begin::details View-->
+<div class="card mb-5 mb-xl-10" id="kt_profile_details_view">
+  <!--begin::Card header-->
+  <div class="card-header cursor-pointer">
+    <!--begin::Card title-->
+    <div class="card-title m-0">
+      <h3 class="fw-bolder m-0">Información personal</h3>
+    </div>
+    <!--end::Card title-->
+    <!--begin::Action-->
+    <button
+      type="button"
+      class="btn btn-primary align-self-center"
+      (click)="openEditModal()"
+    >
+      <i class="fas fa-edit me-2"></i>Editar
+    </button>
+    <!--end::Action-->
+  </div>
+  <!--begin::Card header-->
+  <!--begin::Card body-->
+  <div class="card-body p-9">
+    <!--begin::Row-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Nombre Completo</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="fw-bolder fs-6 text-gray-800">{{ getFullName() | capitalize }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Row-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Email</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8 fv-row">
+        <span class="fw-bold text-gray-800 fs-6">{{ user?.email }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Teléfono de Contacto</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8 d-flex align-items-center">
+        <span class="fw-bolder fs-6 text-gray-800 me-2">{{ user?.phoneNumber || 'No registrado' }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Organización</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="fw-bold fs-6 text-gray-800">{{ user?.tenantName || 'N/A' }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Rol</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="badge badge-light-primary fs-7 fw-bold">{{ user?.role }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-7" *ngIf="user?.createdAt">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">Miembro desde</label>
+      <!--end::Label-->
+      <!--begin::Col-->
+      <div class="col-lg-8">
+        <span class="fw-bold fs-6 text-gray-800">{{ user?.createdAt | date:'dd/MM/yyyy' }}</span>
+      </div>
+      <!--end::Col-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Input group-->
+    <div class="row mb-10">
+      <!--begin::Label-->
+      <label class="col-lg-4 fw-bold text-muted">ID de Usuario</label>
+      <!--begin::Label-->
+      <!--begin::Label-->
+      <div class="col-lg-8">
+        <span class="fw-bold fs-7 text-gray-600">{{ user?.id }}</span>
+      </div>
+      <!--begin::Label-->
+    </div>
+    <!--end::Input group-->
+    <!--begin::Notice-->
+    <div
+      class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-6"
+    >
+      <!--begin::Icon-->
+      <span class="svg-icon svg-icon-2tx svg-icon-warning me-4">
+        <i class="fas fa-info-circle fs-2tx text-warning"></i>
+      </span>
+      <!--end::Icon-->
+      <!--begin::Wrapper-->
+      <div class="d-flex flex-stack flex-grow-1">
+        <!--begin::Content-->
+        <div class="fw-bold">
+          <h4 class="text-gray-900 fw-bolder">Información Importante</h4>
+          <div class="fs-6 text-gray-700">
+            Para cambiar tu contraseña o configurar la autenticación de dos factores, 
+            ve a la pestaña de <strong>Seguridad</strong>.
+          </div>
+        </div>
+        <!--end::Content-->
+      </div>
+      <!--end::Wrapper-->
+    </div>
+    <!--end::Notice-->
+  </div>
+  <!--end::Card body-->
+</div>
+<!--end::details View-->
+
+<!-- Modal de edición -->
+<div class="modal fade show" [class.d-block]="showModal" [style.display]="showModal ? 'block' : 'none'" 
+     tabindex="-1" aria-modal="true" role="dialog" *ngIf="showModal">
+  <div class="modal-dialog modal-dialog-centered mw-650px">
+    <div class="modal-content">
+      <!--begin::Modal header-->
+      <div class="modal-header" id="kt_modal_edit_user_header">
+        <h2 class="fw-bolder">Editar Información Personal</h2>
+        <div class="btn btn-icon btn-sm btn-active-icon-primary" (click)="closeModal()">
+          <span class="svg-icon svg-icon-1">
+            <i class="fas fa-times fs-2"></i>
+          </span>
+        </div>
+      </div>
+      <!--end::Modal header-->
+      <!--begin::Modal body-->
+      <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+        <form [formGroup]="editForm" (ngSubmit)="saveChanges()">
+          <!--begin::Input group-->
+          <div class="fv-row mb-7">
+            <label class="required fw-bold fs-6 mb-2">Nombre</label>
+            <input 
+              type="text" 
+              formControlName="firstName"
+              class="form-control form-control-solid mb-3 mb-lg-0" 
+              placeholder="Ingresa tu nombre"
+              [class.is-invalid]="editForm.get('firstName')?.invalid && editForm.get('firstName')?.touched"
+            />
+            <div class="invalid-feedback" *ngIf="editForm.get('firstName')?.invalid && editForm.get('firstName')?.touched">
+              El nombre es requerido (mínimo 2 caracteres)
+            </div>
+          </div>
+          <!--end::Input group-->
+          <!--begin::Input group-->
+          <div class="fv-row mb-7">
+            <label class="required fw-bold fs-6 mb-2">Apellido</label>
+            <input 
+              type="text" 
+              formControlName="lastName"
+              class="form-control form-control-solid mb-3 mb-lg-0" 
+              placeholder="Ingresa tu apellido"
+              [class.is-invalid]="editForm.get('lastName')?.invalid && editForm.get('lastName')?.touched"
+            />
+            <div class="invalid-feedback" *ngIf="editForm.get('lastName')?.invalid && editForm.get('lastName')?.touched">
+              El apellido es requerido (mínimo 2 caracteres)
+            </div>
+          </div>
+          <!--end::Input group-->
+          <!--begin::Input group-->
+          <div class="fv-row mb-7">
+            <label class="required fw-bold fs-6 mb-2">Email</label>
+            <input 
+              type="email" 
+              formControlName="email"
+              class="form-control form-control-solid mb-3 mb-lg-0" 
+              placeholder="ejemplo@correo.com"
+              [class.is-invalid]="editForm.get('email')?.invalid && editForm.get('email')?.touched"
+            />
+            <div class="invalid-feedback" *ngIf="editForm.get('email')?.invalid && editForm.get('email')?.touched">
+              Ingresa un email válido
+            </div>
+          </div>
+          <!--end::Input group-->
+          <!--begin::Input group-->
+          <div class="fv-row mb-7">
+            <label class="fw-bold fs-6 mb-2">Teléfono</label>
+            <input 
+              type="text" 
+              formControlName="phoneNumber"
+              class="form-control form-control-solid mb-3 mb-lg-0" 
+              placeholder="+57 300 1234567"
+            />
+            <div class="form-text">Opcional: Incluye el código de país</div>
+          </div>
+          <!--end::Input group-->
+          <!--begin::Actions-->
+          <div class="text-center pt-15">
+            <button 
+              type="button" 
+              class="btn btn-light me-3" 
+              (click)="closeModal()"
+              [disabled]="isLoading"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              class="btn btn-primary"
+              [disabled]="isLoading || editForm.invalid"
+            >
+              <span *ngIf="!isLoading">
+                <i class="fas fa-save me-2"></i>Guardar Cambios
+              </span>
+              <span *ngIf="isLoading">
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                Guardando...
+              </span>
+            </button>
+          </div>
+          <!--end::Actions-->
+        </form>
+      </div>
+      <!--end::Modal body-->
+    </div>
+  </div>
+</div>
+
+<!-- Modal backdrop -->
+<div class="modal-backdrop fade show" *ngIf="showModal" (click)="closeModal()"></div>

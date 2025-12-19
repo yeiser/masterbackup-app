@@ -45,7 +45,8 @@ public class GetWorkerCredentialsQueryHandler : IRequestHandler<GetWorkerCredent
         }
 
         // Get RabbitMQ credentials from configuration
-        var rabbitMQHost = _configuration["RabbitMQ:HostName"] ?? _configuration["RabbitMQ:Host"]
+        // Use WorkerHostName for Docker workers, fallback to HostName for local workers
+        var rabbitMQHost = _configuration["RabbitMQ:WorkerHostName"] ?? _configuration["RabbitMQ:HostName"] ?? _configuration["RabbitMQ:Host"]
             ?? throw new InvalidOperationException("RabbitMQ Host not configured");
         var rabbitMQPort = _configuration.GetValue<int>("RabbitMQ:Port", 5672);
         var rabbitMQUsername = _configuration["RabbitMQ:UserName"] ?? _configuration["RabbitMQ:Username"]

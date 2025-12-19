@@ -99,17 +99,33 @@ public class AcceptInvitationCommandHandler : IRequestHandler<AcceptInvitationCo
 
             var token = GenerateJwtToken(user);
 
+            // Obtener información del tenant
+            var tenant = await _masterContext.Tenants
+                .FirstOrDefaultAsync(t => t.Id == user.TenantId, cancellationToken);
+
             return new AuthResponseDto
             {
                 Success = true,
                 Token = token,
+                UserId = user.Id,
+                Email = user.Email!,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Role = user.Role.ToString(),
+                TenantId = user.TenantId.ToString(),
+                TenantName = tenant?.Name,
+                PhoneNumber = user.PhoneNumber,
+                CreatedAt = user.CreatedAt,
                 User = new UserDto
                 {
                     Id = user.Id,
                     Email = user.Email!,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    Role = user.Role.ToString()
+                    Role = user.Role.ToString(),
+                    TenantName = tenant?.Name,
+                    PhoneNumber = user.PhoneNumber,
+                    CreatedAt = user.CreatedAt
                 }
             };
         }

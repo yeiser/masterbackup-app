@@ -92,6 +92,10 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
             // Login exitoso sin 2FA
             var token = GenerateJwtToken(user, user.TenantId);
 
+            // Obtener información del tenant
+            var tenant = await _masterContext.Tenants
+                .FirstOrDefaultAsync(t => t.Id == user.TenantId, cancellationToken);
+
             _logger.LogInformation("Login successful for user: {Email}", request.Email);
 
             return new AuthResponseDto
@@ -104,6 +108,9 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
                 LastName = user.LastName,
                 Role = user.Role.ToString(),
                 TenantId = user.TenantId.ToString(),
+                TenantName = tenant?.Name,
+                PhoneNumber = user.PhoneNumber,
+                CreatedAt = user.CreatedAt,
                 TwoFactorRequired = false,
                 User = new UserDto
                 {
@@ -111,7 +118,10 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthResponseDto
                     Email = user.Email!,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    Role = user.Role.ToString()
+                    Role = user.Role.ToString(),
+                    TenantName = tenant?.Name,
+                    PhoneNumber = user.PhoneNumber,
+                    CreatedAt = user.CreatedAt
                 }
             };
         }
