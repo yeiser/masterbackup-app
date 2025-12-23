@@ -1,0 +1,268 @@
+<!-- Cards List -->
+<div class="card card-flush border border-gray-300">
+  <div class="card-header pt-7">
+    <h3 class="card-title">
+      <span class="card-label fw-bold text-gray-800">Métodos de Pago</span>
+    </h3>
+    <div class="card-toolbar">
+      <button 
+        type="button"
+        class="btn btn-primary btn-sm"
+        (click)="openAddCardModal()">
+        Agregar Tarjeta
+      </button>
+    </div>
+  </div>
+  <div class="card-body pt-5">
+    <!-- No Cards Message -->
+    <div *ngIf="cards.length === 0" class="text-center py-10">
+      <i class="bi bi-credit-card fs-3x text-gray-400 mb-5"></i>
+      <h4 class="text-gray-600 fw-semibold mb-3">No hay tarjetas registradas</h4>
+      <p class="text-gray-500 mb-5">Agrega una tarjeta de crédito o débito para gestionar tus pagos</p>
+      <button 
+        type="button"
+        class="btn btn-primary"
+        (click)="openAddCardModal()">
+        Agregar tarjeta
+      </button>
+    </div>
+
+    <!-- Cards Grid -->
+    <div *ngIf="cards.length > 0" class="row g-5">
+      <div class="col" *ngFor="let card of cards">
+        <div class="card card-bordered h-100" [class.border-primary]="card.isDefault">
+          <div class="card-body">
+            <!-- Card Header -->
+            <div class="d-flex justify-content-between align-items-start mb-5">
+              <div>
+                <span>
+                  <img 
+                    [src]="'assets/media/svg/card-logos/' + getCardIcon(card.cardType)" 
+                    alt="{{ card.cardType }} logo" 
+                    class="me-2" 
+                    style="height: 32px;">
+                </span>
+                <span 
+                  *ngIf="card.isDefault" 
+                  class="badge badge-success ms-2">
+                  Predeterminada
+                </span>
+              </div>
+              <div class="dropdown">
+                <button 
+                  class="btn btn-sm btn-icon btn-light btn-active-light-primary" 
+                  type="button" 
+                  data-bs-toggle="dropdown" 
+                  aria-expanded="false">
+                  <i class="bi bi-three-dots-vertical fs-4"></i>
+                </button>
+                <ul class="dropdown-menu">
+                  <li *ngIf="!card.isDefault">
+                    <a class="dropdown-item" (click)="setDefaultCard(card)">
+                      <i class="bi bi-check-circle text-success me-2"></i>
+                      Establecer como predeterminada
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item text-danger" (click)="deleteCard(card)">
+                      <i class="bi bi-trash me-2"></i>
+                      Eliminar tarjeta
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Card Number -->
+            <div class="mb-4">
+              <div class="text-gray-500 fs-7 mb-1">Número de tarjeta</div>
+              <div class="fs-4 fw-bold text-gray-800 font-monospace">
+                {{ card.cardNumber }}
+              </div>
+            </div>
+
+            <!-- Card Details -->
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="text-gray-500 fs-7 mb-1">Titular</div>
+                <div class="text-gray-800 fw-semibold">{{ card.cardholderName }}</div>
+              </div>
+              <div>
+                <div class="text-gray-500 fs-7 mb-1">Vencimiento</div>
+                <div class="text-gray-800 fw-semibold">
+                  {{ formatExpiryDisplay(card.expiryMonth, card.expiryYear) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Card Modal -->
+<div 
+  class="modal fade" 
+  [class.show]="showAddCardModal" 
+  [style.display]="showAddCardModal ? 'block' : 'none'" 
+  tabindex="-1" 
+  aria-modal="true" 
+  role="dialog" 
+  *ngIf="showAddCardModal">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fw-bold">Agregar Tarjeta</h2>
+        <button 
+          type="button" 
+          class="btn-close" 
+          (click)="closeAddCardModal()" 
+          aria-label="Close">
+        </button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <!-- Cardholder Name -->
+          <div class="mb-5">
+            <label class="form-label required">Nombre del Titular</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              [(ngModel)]="cardholderName"
+              name="cardholderName"
+              placeholder="Como aparece en la tarjeta"
+              [class.is-invalid]="submitted && !cardholderName.trim()">
+            <div class="invalid-feedback" *ngIf="submitted && !cardholderName.trim()">
+              El nombre del titular es requerido
+            </div>
+          </div>
+
+          <!-- Card Number -->
+          <div class="mb-5">
+            <label class="form-label required">Número de Tarjeta</label>
+            <input 
+              type="text" 
+              class="form-control font-monospace" 
+              [(ngModel)]="cardNumber"
+              name="cardNumber"
+              (ngModelChange)="formatCardNumber()"
+              placeholder="1234 5678 9012 3456"
+              maxlength="19"
+              [class.is-invalid]="isCardNumberInvalid()">
+            <div class="invalid-feedback" *ngIf="isCardNumberInvalid()">
+              El número de tarjeta debe tener 16 dígitos
+            </div>
+          </div>
+
+          <!-- Expiry and CVV -->
+          <div class="row">
+            <!-- Expiry Month -->
+            <div class="col-4 mb-5">
+              <label class="form-label required">Mes</label>
+              <select 
+                class="form-select" 
+                [(ngModel)]="expiryMonth"
+                name="expiryMonth"
+                (ngModelChange)="formatExpiry()"
+                [class.is-invalid]="submitted && !expiryMonth">
+                <option value="">MM</option>
+                <option *ngFor="let month of getMonthOptions()" [value]="month">
+                  {{ month }}
+                </option>
+              </select>
+              <div class="invalid-feedback" *ngIf="submitted && !expiryMonth">
+                Requerido
+              </div>
+            </div>
+
+            <!-- Expiry Year -->
+            <div class="col-4 mb-5">
+              <label class="form-label required">Año</label>
+              <select 
+                class="form-select" 
+                [(ngModel)]="expiryYear"
+                name="expiryYear"
+                [class.is-invalid]="submitted && !expiryYear">
+                <option value="">AAAA</option>
+                <option *ngFor="let year of getYearOptions()" [value]="year">
+                  {{ year }}
+                </option>
+              </select>
+              <div class="invalid-feedback" *ngIf="submitted && !expiryYear">
+                Requerido
+              </div>
+            </div>
+
+            <!-- CVV -->
+            <div class="col-4 mb-5">
+              <label class="form-label required">CVV</label>
+              <input 
+                type="text" 
+                class="form-control font-monospace text-center" 
+                [(ngModel)]="cvv"
+                name="cvv"
+                placeholder="123"
+                maxlength="4"
+                pattern="\d*"
+                [class.is-invalid]="submitted && (cvv.length < 3 || cvv.length > 4)">
+              <div class="invalid-feedback" *ngIf="submitted && (cvv.length < 3 || cvv.length > 4)">
+                CVV inválido
+              </div>
+            </div>
+          </div>
+
+          <!-- Set as Default -->
+          <div class="mb-5">
+            <div class="form-check form-check-custom form-check-solid">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                [(ngModel)]="setAsDefault"
+                name="setAsDefault"
+                id="setAsDefault">
+              <label class="form-check-label" for="setAsDefault">
+                Establecer como método de pago predeterminado
+              </label>
+            </div>
+          </div>
+
+          <!-- Security Notice -->
+          <div class="alert alert-dismissible bg-light-info border border-info d-flex flex-column flex-sm-row p-5 mb-0">
+            <i class="bi bi-shield-check fs-2x text-info me-4 mb-5 mb-sm-0"></i>
+            <div class="d-flex flex-column pe-0 pe-sm-10">
+              <h5 class="mb-1">Información segura</h5>
+              <span class="fs-7">Tus datos están protegidos con encriptación SSL de 256 bits</span>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button 
+          type="button" 
+          class="btn btn-light" 
+          (click)="closeAddCardModal()"
+          [disabled]="adding">
+          Cancelar
+        </button>
+        <button 
+          type="button" 
+          class="btn btn-primary" 
+          (click)="addCard()"
+          [disabled]="adding">
+          <span *ngIf="!adding">
+            <i class="bi bi-plus-circle me-2"></i>
+            Agregar Tarjeta
+          </span>
+          <span *ngIf="adding">
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            Agregando...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Backdrop -->
+<div class="modal-backdrop fade" [class.show]="showAddCardModal" *ngIf="showAddCardModal"></div>

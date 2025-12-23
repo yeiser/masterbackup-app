@@ -54,6 +54,10 @@ export class HeaderComponent implements OnInit {
     '/profile': { 
       title: 'Cuenta de usuario', 
       icon: 'fa-user' 
+    },
+    '/subscriptions': { 
+      title: 'Suscripción y uso', 
+      icon: 'fa fa-shopping-basket' 
     }
   };
 

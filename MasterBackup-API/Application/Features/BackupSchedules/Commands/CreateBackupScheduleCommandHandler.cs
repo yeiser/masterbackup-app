@@ -14,19 +14,29 @@ public class CreateBackupScheduleCommandHandler : IRequestHandler<CreateBackupSc
 {
     private readonly TenantDbContext _context;
     private readonly IBackupSchedulerService _schedulerService;
+    private readonly ISubscriptionValidationService _subscriptionValidation;
 
     public CreateBackupScheduleCommandHandler(
         TenantDbContext context,
-        IBackupSchedulerService schedulerService)
+        IBackupSchedulerService schedulerService,
+        ISubscriptionValidationService subscriptionValidation)
     {
         _context = context;
         _schedulerService = schedulerService;
+        _subscriptionValidation = subscriptionValidation;
     }
 
     public async Task<BackupScheduleDto> Handle(CreateBackupScheduleCommand request, CancellationToken cancellationToken)
     {
         try
         {
+            // 0. Validar límites de suscripción (backups programados habilitados)
+            var (canCreate, errorMessage) = await _subscriptionValidation.CanCreateScheduledBackupAsync(cancellationToken);
+            if (!canCreate)
+            {
+                throw new InvalidOperationException(errorMessage);
+            }
+
             // 1. Validar que la DatabaseConnection existe y está activa
             // Nota: DatabaseConnection no tiene TenantId, la validación de tenant se hace via TenantDbContext
             var databaseConnection = await _context.DatabaseConnections

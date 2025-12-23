@@ -215,6 +215,7 @@ builder.Services.AddSingleton<IBlobStorageService>(sp =>
 
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IBackupSchedulerService, BackupSchedulerService>();
+builder.Services.AddScoped<ISubscriptionValidationService, SubscriptionValidationService>();
 
 // Add SignalR for real-time notifications
 builder.Services.AddSignalR();
@@ -231,6 +232,15 @@ builder.Services.AddQuartz(q =>
     {
         tp.MaxConcurrency = 10; // Máximo 10 jobs simultáneos
     });
+    
+    // Configurar el job de verificación de suscripciones (se ejecuta diariamente a las 3:00 AM)
+    var subscriptionCheckJobKey = new JobKey("SubscriptionCheckJob");
+    q.AddJob<MasterBackup_API.Infrastructure.Jobs.SubscriptionCheckJob>(opts => opts.WithIdentity(subscriptionCheckJobKey));
+    q.AddTrigger(opts => opts
+        .ForJob(subscriptionCheckJobKey)
+        .WithIdentity("SubscriptionCheckTrigger")
+        .WithCronSchedule("0 0 3 * * ?") // Diariamente a las 3:00 AM
+        .StartNow());
 });
 
 // Add Quartz hosted service

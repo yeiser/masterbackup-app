@@ -13,17 +13,20 @@ public class CreateDatabaseConnectionCommandHandler : IRequestHandler<CreateData
     private readonly TenantDbContext _context;
     private readonly MasterDbContext _masterDbContext;
     private readonly IEncryptionService _encryptionService;
+    private readonly ISubscriptionValidationService _subscriptionValidation;
     private readonly ILogger<CreateDatabaseConnectionCommandHandler> _logger;
 
     public CreateDatabaseConnectionCommandHandler(
         TenantDbContext context,
         MasterDbContext masterDbContext,
         IEncryptionService encryptionService,
+        ISubscriptionValidationService subscriptionValidation,
         ILogger<CreateDatabaseConnectionCommandHandler> logger)
     {
         _context = context;
         _masterDbContext = masterDbContext;
         _encryptionService = encryptionService;
+        _subscriptionValidation = subscriptionValidation;
         _logger = logger;
     }
 
@@ -32,6 +35,14 @@ public class CreateDatabaseConnectionCommandHandler : IRequestHandler<CreateData
         try
         {
             var dto = request.Dto;
+
+            // Validar límites de suscripción
+            var (canCreate, errorMessage) = await _subscriptionValidation.CanCreateDatabaseAsync(cancellationToken);
+            if (!canCreate)
+            {
+                _logger.LogWarning("Database creation blocked: {Error}", errorMessage);
+                throw new InvalidOperationException(errorMessage);
+            }
 
             // Validar que el worker existe si el modo es Dedicado
             if (dto.AssignmentMode == WorkerAssignmentMode.Dedicated && dto.AssignedWorkerId.HasValue)

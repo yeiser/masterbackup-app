@@ -14,17 +14,20 @@ public class InviteUserCommandHandler : IRequestHandler<InviteUserCommand, bool>
     private readonly MasterDbContext _masterContext;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IEmailService _emailService;
+    private readonly ISubscriptionValidationService _subscriptionValidation;
     private readonly ILogger<InviteUserCommandHandler> _logger;
 
     public InviteUserCommandHandler(
         MasterDbContext masterContext,
         UserManager<ApplicationUser> userManager,
         IEmailService emailService,
+        ISubscriptionValidationService subscriptionValidation,
         ILogger<InviteUserCommandHandler> logger)
     {
         _masterContext = masterContext;
         _userManager = userManager;
         _emailService = emailService;
+        _subscriptionValidation = subscriptionValidation;
         _logger = logger;
     }
 
@@ -32,6 +35,14 @@ public class InviteUserCommandHandler : IRequestHandler<InviteUserCommand, bool>
     {
         try
         {
+            // Validar límites de suscripción
+            var (canCreate, errorMessage) = await _subscriptionValidation.CanCreateUserAsync(cancellationToken);
+            if (!canCreate)
+            {
+                _logger.LogWarning("User invitation blocked: {Error}", errorMessage);
+                throw new InvalidOperationException(errorMessage);
+            }
+
             // Check if user already exists in master database
             var existingUser = await _masterContext.Users
                 .FirstOrDefaultAsync(u => u.Email == request.Email && u.TenantId == request.TenantId, cancellationToken);

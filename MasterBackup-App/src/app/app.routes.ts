@@ -12,6 +12,7 @@ import { BackupScheduleListComponent } from './features/backup-schedule/componen
 import { BackupExecutionListComponent } from './features/backup-execution/components/backup-execution-list/backup-execution-list.component';
 import { NotificationsPageComponent } from './features/notifications/notifications-page.component';
 import { ProfileComponent } from './features/profile/components/profile-page/profile.component';
+import { SubscriptionDetailComponent } from './features/subscription/components/subscription-detail/subscription-detail.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
@@ -35,6 +36,7 @@ export const routes: Routes = [
       { path: 'activity', component: BackupExecutionListComponent },
       { path: 'notifications', component: NotificationsPageComponent },
       { path: 'profile', component: ProfileComponent },
+      { path: 'subscriptions', component: SubscriptionDetailComponent }
       // Agregar más rutas aquí
     ]
   }
